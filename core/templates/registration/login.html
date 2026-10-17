@@ -12,28 +12,39 @@
 <body class="login-page">
   <main class="login-shell">
     <section class="login-card">
-      <span class="login-brand-icon" aria-hidden="true">🛍️</span>
-      <p class="eyebrow">Projeto Integrador</p>
-      <h1>Giro</h1>
-      <p class="muted">Um jeito simples de registrar vendas e acompanhar o estoque do seu negócio.</p>
+      <section class="login-showcase" aria-label="Sobre o Giro">
+        <div class="login-brand">
+          <span class="login-brand-icon" aria-hidden="true">🛒</span>
+          <h1>Giro</h1>
+          <p class="login-tagline">Vendas e estoque em um só lugar.</p>
+        </div>
 
-      <div class="login-features">
-        <span>🧾 Venda rápida por categoria</span>
-        <span>📦 Estoque atualizado automaticamente</span>
-        <span>📊 Resumo por forma de pagamento</span>
-      </div>
+        <p class="login-intro">Um jeito simples de registrar as vendas do dia e saber o que precisa repor.</p>
+        <div class="login-features">
+          <span><i aria-hidden="true">🧾</i> Venda rápida por categoria</span>
+          <span><i aria-hidden="true">📦</i> Estoque atualizado automaticamente</span>
+          <span><i aria-hidden="true">📊</i> Resumo por forma de pagamento</span>
+        </div>
+      </section>
 
-      {% if form.errors %}
-        <div class="alert">Usuário ou senha inválidos.</div>
-      {% endif %}
+      <section class="login-panel" aria-labelledby="login-title">
+        <div class="login-heading">
+          <p class="eyebrow">Bem-vindo de volta</p>
+          <h2 id="login-title">Acesse sua conta</h2>
+          <p class="muted">Entre com seu usuário e senha para continuar.</p>
+        </div>
 
-      <form method="post" class="stack">
-        {% csrf_token %}
-        <label>Usuário {{ form.username }}</label>
-        <label>Senha {{ form.password }}</label>
-        <button type="submit">Entrar</button>
-      </form>
+        {% if form.errors %}
+          <div class="alert" role="alert">Usuário ou senha inválidos. Se este for seu primeiro acesso à versão publicada, ainda pode ser necessário criar o usuário no banco do sistema.</div>
+        {% endif %}
 
+        <form method="post" class="stack login-form">
+          {% csrf_token %}
+          <label for="{{ form.username.id_for_label }}">Usuário {{ form.username }}</label>
+          <label for="{{ form.password.id_for_label }}">Senha {{ form.password }}</label>
+          <button type="submit">Entrar <span aria-hidden="true">→</span></button>
+        </form>
+      </section>
     </section>
   </main>
 </body>
