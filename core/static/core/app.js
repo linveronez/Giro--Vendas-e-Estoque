@@ -105,14 +105,24 @@ if (saleForm) {
       }
     });
 
-    const discount = Math.max(0, Number(discountInput.value.replace(",", ".")) || 0);
+    const discount = discountInput
+      ? Math.max(0, Number(discountInput.value.replace(",", ".")) || 0)
+      : 0;
     const appliedDiscount = Math.min(discount, subtotal);
     const total = subtotal - appliedDiscount;
-    discountInput.max = subtotal.toFixed(2);
-    discountReasonInput.required = discount > 0;
+    if (discountInput) {
+      discountInput.max = subtotal.toFixed(2);
+      discountInput.setCustomValidity(discount > subtotal ? "O desconto não pode ser maior que o subtotal." : "");
+    }
+    if (discountReasonInput) {
+      discountReasonInput.required = discount > 0;
+      discountReasonInput.setCustomValidity(
+        discount > 0 && !discountReasonInput.value.trim() ? "Informe o motivo para aplicar o desconto." : "",
+      );
+    }
     const countText = `${quantityTotal} ${quantityTotal === 1 ? "item" : "itens"}`;
-    subtotalElement.textContent = currency.format(subtotal);
-    discountTotalElement.textContent = currency.format(appliedDiscount);
+    if (subtotalElement) subtotalElement.textContent = currency.format(subtotal);
+    if (discountTotalElement) discountTotalElement.textContent = currency.format(appliedDiscount);
     totalElement.textContent = currency.format(total);
     cartCount.textContent = countText;
     mobileCartCount.textContent = countText;
@@ -131,7 +141,8 @@ if (saleForm) {
   }
 
   search.addEventListener("input", filterProducts);
-  discountInput.addEventListener("input", renderCart);
+  discountInput?.addEventListener("input", renderCart);
+  discountReasonInput?.addEventListener("input", renderCart);
   search.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -204,6 +215,11 @@ if (saleForm) {
   saleForm.addEventListener("submit", (event) => {
     if (cart.size === 0) {
       event.preventDefault();
+      return;
+    }
+    if (!saleForm.checkValidity()) {
+      event.preventDefault();
+      saleForm.reportValidity();
       return;
     }
     checkout.disabled = true;
