@@ -1,13 +1,35 @@
+import os
+
 from django.contrib.auth.models import Group, User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
 
 from core.models import Item
 
 
 class Command(BaseCommand):
-    help = "Cria perfis e usuarios iniciais do sistema."
+    help = "Cria perfis e dados fictícios da demonstração."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--reset-stock",
+            action="store_true",
+            help="Restaura os estoques iniciais do catálogo de demonstração após confirmação.",
+        )
 
     def handle(self, *args, **options):
+        postgres = connection.vendor == "postgresql"
+        demo_password = os.environ.get("DEMO_PASSWORD", "")
+        if postgres and not demo_password.strip():
+            raise CommandError(
+                "O seed no PostgreSQL exige DEMO_PASSWORD no ambiente para criar/atualizar o usuário demo."
+            )
+
+        reset_stock = options["reset_stock"]
+        if reset_stock and not self._confirm_stock_reset():
+            self.stdout.write(self.style.WARNING("Operação cancelada; nenhum dado foi alterado."))
+            return
+
         products = [
             ("Café coado", "Bebidas quentes", "☕", "3.00", 40, 10),
             ("Cappuccino", "Bebidas quentes", "☕", "5.50", 25, 8),
@@ -29,36 +51,72 @@ class Command(BaseCommand):
             ("Pão na chapa", "Lanches", "🍞", "5.00", 15, 5),
             ("Sanduíche natural", "Lanches", "🥗", "10.00", 0, 3),
         ]
-        for nome, categoria, emoji, preco, estoque, minimo in products:
-            item, created = Item.objects.get_or_create(
-                nome=nome,
-                defaults={"categoria": categoria, "emoji": emoji, "preco": preco, "estoque": estoque, "estoque_minimo": minimo},
-            )
-            if not created:
+
+        with transaction.atomic():
+            for nome, categoria, emoji, preco, estoque_inicial, minimo in products:
+                item, created = Item.objects.get_or_create(
+                    nome=nome,
+                    defaults={
+                        "categoria": categoria,
+                        "emoji": emoji,
+                        "preco": preco,
+                        "estoque": estoque_inicial,
+                        "estoque_minimo": minimo,
+                    },
+                )
+                if created:
+                    continue
+
                 item.categoria = categoria
                 item.emoji = emoji
                 item.preco = preco
                 item.estoque_minimo = minimo
                 item.ativo = True
-                if not item.vendaitem_set.exists():
-                    item.estoque = estoque
+                if reset_stock or not item.vendaitem_set.exists():
+                    item.estoque = estoque_inicial
                 item.save()
-        for nome_antigo in ("Refrigerante lata", "Suco natural", "Cookie", "Bolo do dia"):
-            antigo = Item.objects.filter(nome=nome_antigo).first()
-            if antigo:
-                if antigo.vendaitem_set.exists():
-                    antigo.ativo = False
-                    antigo.save(update_fields=["ativo", "atualizado_em"])
-                else:
-                    antigo.delete()
-        self.stdout.write(self.style.SUCCESS(f"{len(products)} produtos de demonstração verificados."))
 
+            self._remove_legacy_products(("Refrigerante lata", "Suco natural", "Cookie", "Bolo do dia"))
+            if postgres:
+                self._seed_postgres_demo_user(demo_password)
+            else:
+                self._seed_local_users()
+
+        self.stdout.write(self.style.SUCCESS(f"{len(products)} produtos de demonstração verificados."))
+        if reset_stock:
+            self.stdout.write(self.style.SUCCESS("Estoque inicial restaurado para o catálogo de demonstração."))
+
+    def _confirm_stock_reset(self) -> bool:
+        self.stdout.write(
+            self.style.WARNING(
+                "Atenção: o reset substituirá o estoque atual dos produtos de demonstração, "
+                "inclusive os que já possuem vendas."
+            )
+        )
+        try:
+            confirmation = input("Digite RESETAR para confirmar: ").strip()
+        except EOFError:
+            confirmation = ""
+        return confirmation == "RESETAR"
+
+    def _remove_legacy_products(self, names):
+        for nome in names:
+            antigo = Item.objects.filter(nome=nome).first()
+            if not antigo:
+                continue
+            if antigo.vendaitem_set.exists():
+                antigo.ativo = False
+                antigo.save(update_fields=["ativo", "atualizado_em"])
+            else:
+                antigo.delete()
+
+    def _seed_local_users(self):
         users = [
-            ("Dono", "dono", "123456", True),
-            ("Coordenador", "coordenador", "123456", False),
-            ("Atendente", "atendente", "123456", False),
+            ("Dono", "dono", True),
+            ("Coordenador", "coordenador", False),
+            ("Atendente", "atendente", False),
         ]
-        for group_name, username, password, is_staff in users:
+        for group_name, username, is_staff in users:
             group, _ = Group.objects.get_or_create(name=group_name)
             user, created = User.objects.get_or_create(
                 username=username,
@@ -69,9 +127,24 @@ class Command(BaseCommand):
                 },
             )
             if created:
-                user.set_password(password)
+                user.set_password("123456")
             user.is_staff = is_staff
             user.groups.set([group])
             user.save()
             status = "criado" if created else "atualizado"
-            self.stdout.write(self.style.SUCCESS(f"Usuario {username} {status}."))
+            self.stdout.write(self.style.SUCCESS(f"Usuário local {username} {status}."))
+
+    def _seed_postgres_demo_user(self, password: str):
+        group, _ = Group.objects.get_or_create(name="Dono")
+        user, created = User.objects.get_or_create(
+            username="demo",
+            defaults={"first_name": "Demo"},
+        )
+        user.first_name = "Demo"
+        user.is_staff = True
+        user.is_superuser = True
+        user.set_password(password)
+        user.groups.set([group])
+        user.save()
+        status = "criado" if created else "atualizado"
+        self.stdout.write(self.style.SUCCESS(f"Usuário de demonstração demo {status} no PostgreSQL."))
