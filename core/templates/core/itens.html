@@ -27,6 +27,25 @@
     {% if not can_manage_items %}<p class="muted">Meu perfil atual apenas realiza vendas.</p>{% endif %}
   </form>
 
+  <section class="panel category-management">
+    <div class="panel-title-row">
+      <div>
+        <h2>🏷️ Categorias</h2>
+        <p class="muted">As categorias adicionadas aparecem no cadastro de produtos e nos filtros do caixa.</p>
+      </div>
+    </div>
+    <form class="category-create-form" method="post" action="{% url 'criar_categoria' %}">
+      {% csrf_token %}
+      <label>{{ categoria_form.nome.label }} {{ categoria_form.nome }}</label>
+      <label>{{ categoria_form.emoji.label }} {{ categoria_form.emoji }}</label>
+      <button type="submit" {% if not can_manage_items %}disabled{% endif %}>＋ Adicionar categoria</button>
+    </form>
+    <div class="category-chip-list" aria-label="Categorias disponíveis">
+      {% for categoria in categorias %}<span class="category-chip">{{ categoria.emoji|default:"🏷️" }} {{ categoria.nome }}</span>{% endfor %}
+    </div>
+    {% if not can_manage_items %}<p class="muted">Meu perfil atual não pode cadastrar categorias.</p>{% endif %}
+  </section>
+
   <section class="panel">
     <div class="panel-title-row">
       <h2>Produtos cadastrados</h2>
@@ -35,7 +54,7 @@
         <select name="categoria">
           <option value="">Todas as categorias</option>
           {% for categoria in categorias %}
-            <option value="{{ categoria }}" {% if categoria == categoria_selecionada %}selected{% endif %}>{{ categoria }}</option>
+            <option value="{{ categoria.nome }}" {% if categoria.nome == categoria_selecionada %}selected{% endif %}>{{ categoria.nome }}</option>
           {% endfor %}
         </select>
         <button type="submit">Filtrar</button>
@@ -43,12 +62,15 @@
       </form>
     </div>
     <table>
-      <thead><tr><th>Item</th><th>Valor</th><th>Estoque</th><th>Mínimo</th><th>Status</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Item</th><th>Preço</th><th>Custo unit.</th><th>Lucro unit.</th><th>Margem</th><th>Estoque</th><th>Mínimo</th><th>Status</th><th>Ações</th></tr></thead>
       <tbody>
         {% for item in itens %}
           <tr>
             <td data-label="Item">{{ item.emoji|default:'🛍️' }} {{ item.nome }}<small>{{ item.categoria|default:"Outros" }}</small></td>
             <td data-label="Valor">{{ item.preco|br_money }}</td>
+            <td data-label="Custo unitário">{% if item.custo is not None %}{{ item.custo|br_money }}{% else %}<span class="muted">Não informado</span>{% endif %}</td>
+            <td data-label="Lucro unitário">{% if item.lucro_unitario is not None %}{{ item.lucro_unitario|br_money }}{% else %}—{% endif %}</td>
+            <td data-label="Margem">{% if item.margem_percentual is not None %}{{ item.margem_percentual|floatformat:2 }}%{% else %}—{% endif %}</td>
             <td data-label="Estoque" class="{% if item.estoque_baixo %}negative{% endif %}">{{ item.estoque }}</td>
             <td data-label="Mínimo">{{ item.estoque_minimo }}</td>
             <td data-label="Status">{% if item.ativo %}Ativo{% else %}Inativo{% endif %}</td>
@@ -59,6 +81,12 @@
                     {% csrf_token %}
                     <span>Preço</span>
                     <input name="preco" type="number" min="0.01" step="0.01" value="{{ item.preco|stringformat:'0.2f' }}">
+                    <button class="small-button" type="submit">Salvar</button>
+                  </form>
+                  <form class="item-action-form" method="post" action="{% url 'atualizar_custo_item' item.id %}">
+                    {% csrf_token %}
+                    <span>Custo unitário</span>
+                    <input name="custo" type="number" min="0" step="0.01" value="{% if item.custo is not None %}{{ item.custo|stringformat:'0.2f' }}{% endif %}" placeholder="Não informado">
                     <button class="small-button" type="submit">Salvar</button>
                   </form>
                   <form class="item-action-form" method="post" action="{% url 'atualizar_estoque_item' item.id %}">
@@ -78,7 +106,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="6">Nenhum item encontrado.</td></tr>
+          <tr><td colspan="9">Nenhum item encontrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>

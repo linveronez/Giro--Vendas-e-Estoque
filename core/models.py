@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.core.validators import MinValueValidator
 from django.urls import reverse
 
 
@@ -28,20 +29,43 @@ class Cliente(models.Model):
         return reverse("clientes")
 
 
+DEFAULT_CATEGORIAS = [
+    ("Bebidas quentes", "Bebidas quentes"),
+    ("Bebidas frias", "Bebidas frias"),
+    ("Salgados", "Salgados"),
+    ("Doces", "Doces"),
+    ("Lanches", "Lanches"),
+    ("Outros", "Outros"),
+]
+
+
+class Categoria(models.Model):
+    nome = models.CharField(max_length=40, unique=True)
+    emoji = models.CharField(max_length=16, blank=True, default="🏷️")
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "categoria"
+        verbose_name_plural = "categorias"
+
+    def __str__(self) -> str:
+        return self.nome
+
+
 class Item(models.Model):
-    CATEGORIAS = [
-        ("Bebidas quentes", "Bebidas quentes"),
-        ("Bebidas frias", "Bebidas frias"),
-        ("Salgados", "Salgados"),
-        ("Doces", "Doces"),
-        ("Lanches", "Lanches"),
-        ("Outros", "Outros"),
-    ]
+    CATEGORIAS = DEFAULT_CATEGORIAS
 
     nome = models.CharField(max_length=140)
-    categoria = models.CharField(max_length=40, choices=CATEGORIAS, default="Outros")
+    categoria = models.CharField(max_length=40, default="Outros")
     emoji = models.CharField(max_length=16, blank=True)
     preco = models.DecimalField(max_digits=10, decimal_places=2)
+    custo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
     estoque = models.PositiveIntegerField(default=0)
     estoque_minimo = models.PositiveIntegerField(default=5)
     ativo = models.BooleanField(default=True)
@@ -60,6 +84,18 @@ class Item(models.Model):
     def estoque_baixo(self) -> bool:
         return self.ativo and self.estoque <= self.estoque_minimo
 
+    @property
+    def lucro_unitario(self):
+        if self.custo is None:
+            return None
+        return self.preco - self.custo
+
+    @property
+    def margem_percentual(self):
+        if self.custo is None or self.preco <= 0:
+            return None
+        return (self.preco - self.custo) * Decimal("100") / self.preco
+
 
 class Venda(models.Model):
     PAGAMENTOS = [
@@ -72,7 +108,17 @@ class Venda(models.Model):
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="vendas", null=True, blank=True)
     atendente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vendas")
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    desconto = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     total = models.DecimalField(max_digits=10, decimal_places=2)
+    desconto_aplicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="descontos_aplicados",
+        null=True,
+        blank=True,
+    )
+    desconto_motivo = models.CharField(max_length=180, blank=True)
     saldo_apos_venda = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     forma_pagamento = models.CharField(max_length=20, choices=PAGAMENTOS, default="dinheiro")
     status = models.CharField(max_length=20, choices=STATUS, default="concluida")
@@ -100,7 +146,9 @@ class VendaItem(models.Model):
     descricao_avulso = models.CharField(max_length=140, blank=True)
     quantidade = models.PositiveIntegerField()
     valor_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    custo_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    desconto = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     class Meta:
         verbose_name = "item da venda"

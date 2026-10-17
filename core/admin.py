@@ -1,19 +1,26 @@
 from django.contrib import admin
 
-from .models import Cliente, Item, MovimentoCredito, Venda, VendaItem
+from .models import Categoria, Cliente, Item, MovimentoCredito, Venda, VendaItem
+
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ["nome", "emoji"]
+    search_fields = ["nome"]
 
 
 class VendaItemInline(admin.TabularInline):
     model = VendaItem
     extra = 0
-    readonly_fields = ["item", "quantidade", "valor_unitario", "subtotal"]
+    readonly_fields = ["item", "quantidade", "valor_unitario", "custo_unitario", "subtotal", "desconto"]
 
 
 @admin.register(Venda)
 class VendaAdmin(admin.ModelAdmin):
-    list_display = ["id", "cliente", "atendente", "total", "saldo_apos_venda", "criado_em"]
+    list_display = ["id", "cliente", "atendente", "subtotal", "desconto", "total", "desconto_aplicado_por", "criado_em"]
     list_filter = ["criado_em", "atendente"]
     search_fields = ["cliente__nome", "atendente__username"]
+    readonly_fields = ["subtotal", "desconto", "total", "desconto_aplicado_por", "desconto_motivo"]
     inlines = [VendaItemInline]
 
 
@@ -25,7 +32,7 @@ class ClienteAdmin(admin.ModelAdmin):
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display = ["nome", "categoria", "preco", "estoque", "estoque_minimo", "ativo"]
+    list_display = ["nome", "categoria", "preco", "custo", "estoque", "estoque_minimo", "ativo"]
     list_filter = ["ativo", "categoria"]
     search_fields = ["nome", "categoria"]
 

@@ -23,12 +23,7 @@
     <div class="category-tabs" role="group" aria-label="Filtrar produtos por categoria">
       <button type="button" class="category-tab active" data-category-filter="*">✨ Tudo</button>
       {% for categoria in categorias %}
-        {% if categoria == "Bebidas quentes" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">☕ {{ categoria }}</button>
-        {% elif categoria == "Bebidas frias" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥤 {{ categoria }}</button>
-        {% elif categoria == "Salgados" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥐 {{ categoria }}</button>
-        {% elif categoria == "Doces" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🍰 {{ categoria }}</button>
-        {% elif categoria == "Lanches" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥪 {{ categoria }}</button>
-        {% else %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🧺 {{ categoria }}</button>{% endif %}
+        <button type="button" class="category-tab" data-category-filter="{{ categoria.nome }}">{{ categoria.emoji|default:"🏷️" }} {{ categoria.nome }}</button>
       {% endfor %}
     </div>
 
@@ -44,7 +39,7 @@
       {% for item in itens %}
         <button type="button" class="product-card {% if item.estoque == 0 %}is-sold-out{% endif %}" data-add-product data-id="{{ item.id }}"
           data-name="{{ item.nome }}" data-price="{{ item.preco }}" data-stock="{{ item.estoque }}"
-          data-category="{{ item.categoria|default:'Outros' }}" data-emoji="{{ item.emoji }}" {% if item.estoque == 0 %}disabled{% endif %}>
+          data-category="{{ item.categoria|default:'Outros' }}" data-category-emoji="{{ item.categoria_emoji }}" data-emoji="{{ item.emoji }}" {% if item.estoque == 0 %}disabled{% endif %}>
           <span class="product-emoji" aria-hidden="true">{{ item.emoji|default:'🛍️' }}</span>
           <span class="product-card-name">{{ item.nome }}</span>
           <strong>{{ item.preco|br_money }}</strong>
@@ -55,7 +50,7 @@
       {% endfor %}
       <p class="catalog-no-results" data-no-results hidden>Nenhum produto encontrado nessa busca.</p>
     </div>
-    <p class="catalog-hint">Não encontrou o que precisa? <a href="{% url 'itens' %}">Cadastre um produto</a> ou organize em <strong>🧺 Outros</strong>.</p>
+    <p class="catalog-hint">Não encontrou o que precisa? <a href="{% url 'itens' %}">Cadastre um produto ou uma categoria</a>.</p>
   </section>
 
   <aside class="sale-cart panel" id="sale-cart">
@@ -72,6 +67,14 @@
           <option value="cartao_credito">💳 Cartão de crédito</option>
         </select>
       </label>
+      <label>Desconto na venda (R$)
+        <input name="desconto" type="number" min="0" step="0.01" value="0.00" data-sale-discount>
+      </label>
+      <label>Motivo do desconto
+        <input name="desconto_motivo" type="text" maxlength="180" placeholder="Obrigatório quando houver desconto" data-sale-discount-reason>
+      </label>
+      <div class="cart-total"><span>Subtotal</span><strong data-sale-subtotal>R$ 0,00</strong></div>
+      <div class="cart-total"><span>Desconto</span><strong data-sale-discount-total>R$ 0,00</strong></div>
       <div class="cart-total"><span>Total</span><strong data-sale-total>R$ 0,00</strong></div>
       <button class="checkout-button" type="submit" data-checkout disabled>✅ Finalizar venda</button>
       <small class="cart-note">Ao finalizar, o estoque é atualizado automaticamente.</small>

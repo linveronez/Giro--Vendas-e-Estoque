@@ -20,7 +20,7 @@
         <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Início</a>
         <a href="{% url 'vendas' %}" class="{% if request.resolver_match.url_name == 'vendas' %}active{% endif %}">🧾 Caixa</a>
         <a href="{% url 'itens' %}" class="{% if request.resolver_match.url_name == 'itens' %}active{% endif %}">📦 Produtos</a>
-        <a href="{% url 'relatorios' %}" class="{% if request.resolver_match.url_name == 'relatorios' %}active{% endif %}">📊 Resumo</a>
+        {% if can_view_reports %}<a href="{% url 'relatorios' %}" class="{% if request.resolver_match.url_name == 'relatorios' %}active{% endif %}">📊 Resumo</a>{% endif %}
       </nav>
       <div class="user-box">
         <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>

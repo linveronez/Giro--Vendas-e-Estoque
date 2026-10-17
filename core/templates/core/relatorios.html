@@ -16,11 +16,27 @@
   <span class="muted">O padrão mostra o mês atual.</span>
 </form>
 
+<section class="panel report-exports">
+  <h2>⬇️ Exportar dados para CSV</h2>
+  <p class="muted">As vendas respeitam o período selecionado; os arquivos de estoque e produtos mostram o cadastro atual.</p>
+  <div class="report-export-actions">
+    <a class="ghost-button" href="{% url 'exportar_vendas_csv' %}?data_inicio={{ data_inicio|date:'Y-m-d' }}&amp;data_fim={{ data_fim|date:'Y-m-d' }}">📄 Vendas do período</a>
+    <a class="ghost-button" href="{% url 'exportar_estoque_csv' %}">📦 Estoque atual</a>
+    <a class="ghost-button" href="{% url 'exportar_produtos_csv' %}">🏷️ Produtos cadastrados</a>
+  </div>
+</section>
+
 <section class="metrics">
   <article><span>💰 Total no período</span><strong>{{ total_periodo|br_money }}</strong></article>
   <article><span>🧾 Vendas concluídas</span><strong>{{ quantidade_vendas }}</strong></article>
+  <article><span>Subtotal antes de descontos</span><strong>{{ subtotal_periodo|br_money }}</strong></article>
+  <article><span>🏷️ Descontos concedidos</span><strong>{{ desconto_periodo|br_money }}</strong></article>
+  <article><span>📦 Custo dos itens com custo informado</span><strong>{{ custo_vendido|br_money }}</strong></article>
+  <article><span>📈 Lucro bruto estimado</span><strong>{{ lucro_bruto|br_money }}</strong></article>
+  <article><span>Margem bruta estimada</span><strong>{% if margem_bruta is not None %}{{ margem_bruta|floatformat:2 }}%{% else %}—{% endif %}</strong></article>
   {% for pagamento in pagamentos_periodo %}<article><span>{{ pagamento.nome }}</span><strong>{{ pagamento.total|br_money }}</strong></article>{% endfor %}
 </section>
+{% if linhas_sem_custo %}<p class="muted">O cálculo de lucro e margem considera apenas itens vendidos com custo conhecido; {{ linhas_sem_custo }} linha(s), como itens avulsos ou produtos sem custo cadastrado, ficaram fora do cálculo.</p>{% endif %}
 
 <section class="report-grid">
   <section class="panel">
@@ -48,19 +64,21 @@
 <section class="panel">
   <h2>🧾 Vendas do período</h2>
   <table>
-    <thead><tr><th>Venda</th><th>Pagamento</th><th>Total</th><th>Atendente</th><th>Data</th><th>Ação</th></tr></thead>
+    <thead><tr><th>Venda</th><th>Pagamento</th><th>Subtotal</th><th>Desconto</th><th>Total</th><th>Atendente</th><th>Data</th><th>Ação</th></tr></thead>
     <tbody>
       {% for venda in vendas %}
         <tr>
           <td data-label="Venda">#{{ venda.id }}</td>
           <td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td>
-          <td data-label="Total">{{ venda.total|br_money }}</td>
+          <td data-label="Subtotal">{{ venda.subtotal|br_money }}</td>
+          <td data-label="Desconto">{{ venda.desconto|br_money }}{% if venda.desconto %}<small>{{ venda.desconto_aplicado_por.get_full_name|default:venda.desconto_aplicado_por.username }} · {{ venda.desconto_motivo }}</small>{% endif %}</td>
+          <td data-label="Total líquido">{{ venda.total|br_money }}</td>
           <td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td>
           <td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td>
           <td data-label="Ação"><form method="post" action="{% url 'cancelar_venda' venda.id %}" onsubmit="return confirm('Cancelar a venda e devolver os itens ao estoque?');">{% csrf_token %}<button class="danger-button small-button" type="submit">Cancelar</button></form></td>
         </tr>
       {% empty %}
-        <tr><td colspan="6">Sem vendas nesse período.</td></tr>
+        <tr><td colspan="8">Sem vendas nesse período.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -69,11 +87,11 @@
 <section class="panel">
   <h2>↩️ Vendas canceladas</h2>
   <table>
-    <thead><tr><th>Venda</th><th>Pagamento</th><th>Total</th><th>Atendente</th><th>Data</th></tr></thead>
+    <thead><tr><th>Venda</th><th>Pagamento</th><th>Subtotal</th><th>Desconto</th><th>Total líquido</th><th>Atendente</th><th>Data</th></tr></thead>
     <tbody>
       {% for venda in vendas_canceladas %}
-        <tr><td data-label="Venda">#{{ venda.id }}</td><td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td><td data-label="Total">{{ venda.total|br_money }}</td><td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td><td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td></tr>
-      {% empty %}<tr><td colspan="5">Nenhuma venda cancelada.</td></tr>{% endfor %}
+        <tr><td data-label="Venda">#{{ venda.id }}</td><td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td><td data-label="Subtotal">{{ venda.subtotal|br_money }}</td><td data-label="Desconto">{{ venda.desconto|br_money }}{% if venda.desconto %}<small>{{ venda.desconto_aplicado_por.get_full_name|default:venda.desconto_aplicado_por.username }} · {{ venda.desconto_motivo }}</small>{% endif %}</td><td data-label="Total líquido">{{ venda.total|br_money }}</td><td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td><td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td></tr>
+      {% empty %}<tr><td colspan="7">Nenhuma venda cancelada.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>

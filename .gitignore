@@ -5,6 +5,8 @@ db.sqlite3
 db.sqlite3.*.bak
 media/
 staticfiles/
+/Docs Projeto/
+/files.zip
 .env
 .env.*
 !.env.example

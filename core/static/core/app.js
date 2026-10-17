@@ -9,6 +9,10 @@ if (saleForm) {
   const hiddenInputs = document.querySelector("[data-sale-hidden]");
   const emptyCart = document.querySelector("[data-sale-empty]");
   const totalElement = document.querySelector("[data-sale-total]");
+  const subtotalElement = document.querySelector("[data-sale-subtotal]");
+  const discountInput = document.querySelector("[data-sale-discount]");
+  const discountTotalElement = document.querySelector("[data-sale-discount-total]");
+  const discountReasonInput = document.querySelector("[data-sale-discount-reason]");
   const cartCount = document.querySelector("[data-cart-count]");
   const checkout = document.querySelector("[data-checkout]");
   const adHocPanel = document.querySelector("[data-adhoc-panel]");
@@ -23,14 +27,7 @@ if (saleForm) {
   let activeCategory = "*";
 
   const normalize = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const categoryEmoji = (category) => ({
-    "Bebidas quentes": "☕",
-    "Bebidas frias": "🥤",
-    "Salgados": "🥐",
-    "Doces": "🍰",
-    "Lanches": "🥪",
-    "Outros": "🧺",
-  }[category] || "🛍️");
+  const categoryEmoji = (card) => card.dataset.categoryEmoji || "🛍️";
 
   function filterProducts() {
     const query = normalize(search.value.trim());
@@ -68,18 +65,18 @@ if (saleForm) {
     hiddenInputs.replaceChildren();
     emptyCart.hidden = cart.size > 0;
     checkout.disabled = cart.size === 0;
-    let total = 0;
+    let subtotal = 0;
     let quantityTotal = 0;
 
     cart.forEach((product) => {
-      total += product.price * product.quantity;
+      subtotal += product.price * product.quantity;
       quantityTotal += product.quantity;
       const row = document.createElement("article");
       row.className = "cart-line";
       const details = document.createElement("div");
       details.className = "cart-product-details";
       const name = document.createElement("strong");
-      name.textContent = `${product.emoji || categoryEmoji(product.category)} ${product.name}`;
+      name.textContent = `${product.emoji || product.categoryEmoji || "🛍️"} ${product.name}`;
       const unitPrice = document.createElement("small");
       unitPrice.textContent = `${currency.format(product.price)} cada${product.adHoc ? " · avulso" : ""}`;
       details.append(name, unitPrice);
@@ -108,7 +105,14 @@ if (saleForm) {
       }
     });
 
+    const discount = Math.max(0, Number(discountInput.value.replace(",", ".")) || 0);
+    const appliedDiscount = Math.min(discount, subtotal);
+    const total = subtotal - appliedDiscount;
+    discountInput.max = subtotal.toFixed(2);
+    discountReasonInput.required = discount > 0;
     const countText = `${quantityTotal} ${quantityTotal === 1 ? "item" : "itens"}`;
+    subtotalElement.textContent = currency.format(subtotal);
+    discountTotalElement.textContent = currency.format(appliedDiscount);
     totalElement.textContent = currency.format(total);
     cartCount.textContent = countText;
     mobileCartCount.textContent = countText;
@@ -127,6 +131,7 @@ if (saleForm) {
   }
 
   search.addEventListener("input", filterProducts);
+  discountInput.addEventListener("input", renderCart);
   search.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -144,7 +149,7 @@ if (saleForm) {
 
   cards.forEach((card) => {
     const emoji = card.querySelector(".product-emoji");
-    emoji.textContent = card.dataset.emoji || categoryEmoji(card.dataset.category || "Outros");
+    emoji.textContent = card.dataset.emoji || categoryEmoji(card);
     card.addEventListener("click", () => {
       if (card.disabled) return;
       const id = card.dataset.id;
@@ -155,6 +160,7 @@ if (saleForm) {
         id,
         name: card.dataset.name,
         category: card.dataset.category || "Outros",
+        categoryEmoji: categoryEmoji(card),
         emoji: card.dataset.emoji,
         price: Number(card.dataset.price.replace(",", ".")),
         stock: Number(card.dataset.stock),
@@ -175,7 +181,7 @@ if (saleForm) {
       return;
     }
     const id = `avulso-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    cart.set(id, { id, name, category: "Outros", price, quantity, stock: Number.POSITIVE_INFINITY, adHoc: true });
+    cart.set(id, { id, name, category: "Outros", categoryEmoji: "🧺", price, quantity, stock: Number.POSITIVE_INFINITY, adHoc: true });
     adHocName.value = "";
     adHocPrice.value = "";
     adHocQuantity.value = "1";

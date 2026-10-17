@@ -1,5 +1,8 @@
 import base64
-from decimal import Decimal, InvalidOperation
+import csv
+import io
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
+from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,28 +16,33 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from .forms import ClienteForm, ClienteUpdateForm, CreditoForm, ItemEstoqueForm, ItemForm, ItemPrecoForm
-from .models import Cliente, Item, MovimentoCredito, Venda, VendaItem
+from .forms import CategoriaForm, ClienteForm, ClienteUpdateForm, CreditoForm, ItemCustoForm, ItemEstoqueForm, ItemForm, ItemPrecoForm
+from .models import Categoria, Cliente, DEFAULT_CATEGORIAS, Item, MovimentoCredito, Venda, VendaItem
 
 
 ROLE_OWNER = "Dono"
-ROLE_COORDINATOR = "Coordenador"
+ROLE_MANAGER = "Gerente"
+ROLE_LEGACY_COORDINATOR = "Coordenador"
 ROLE_ATTENDANT = "Atendente"
 
 
 def user_role(user) -> str:
     if user.is_superuser:
         return ROLE_OWNER
-    group = user.groups.first()
-    return group.name if group else ROLE_ATTENDANT
+    groups = set(user.groups.values_list("name", flat=True))
+    if ROLE_OWNER in groups:
+        return ROLE_OWNER
+    if {ROLE_MANAGER, ROLE_LEGACY_COORDINATOR} & groups:
+        return ROLE_MANAGER
+    return ROLE_ATTENDANT
 
 
 def can_manage_credit(user) -> bool:
-    return user_role(user) in {ROLE_OWNER, ROLE_COORDINATOR}
+    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
 
 
 def can_manage_clients(user) -> bool:
-    return user_role(user) in {ROLE_OWNER, ROLE_COORDINATOR}
+    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
 
 
 def can_debit_credit(user) -> bool:
@@ -42,11 +50,11 @@ def can_debit_credit(user) -> bool:
 
 
 def can_manage_items(user) -> bool:
-    return user_role(user) in {ROLE_OWNER, ROLE_COORDINATOR}
+    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
 
 
 def can_view_reports(user) -> bool:
-    return user_role(user) == ROLE_OWNER
+    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
 
 
 def role_context(request) -> dict:
@@ -60,10 +68,11 @@ def role_context(request) -> dict:
     }
 
 
-def owner_required(view_func):
+def manager_or_owner_required(view_func):
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not can_view_reports(request.user):
-            messages.error(request, "Somente o perfil Dono acessa relatorios.")
+            messages.error(request, "Somente os perfis Dono e Gerente acessam esta área.")
             return redirect("dashboard")
         return view_func(request, *args, **kwargs)
 
@@ -125,7 +134,7 @@ def clientes(request):
 @require_POST
 def atualizar_cliente(request, cliente_id):
     if not can_manage_clients(request.user):
-        messages.error(request, "Somente Dono ou Coordenador atualiza cadastro de cliente.")
+        messages.error(request, "Somente Dono ou Gerente atualiza cadastro de cliente.")
         return redirect("clientes")
 
     cliente = get_object_or_404(Cliente, pk=cliente_id)
@@ -154,7 +163,7 @@ def atualizar_cliente(request, cliente_id):
 @require_POST
 def ajustar_credito(request):
     if not can_manage_credit(request.user):
-        messages.error(request, "Somente Dono ou Coordenador ajusta credito.")
+        messages.error(request, "Somente Dono ou Gerente ajusta credito.")
         return redirect("clientes")
 
     form = CreditoForm(request.POST)
@@ -185,7 +194,7 @@ def ajustar_credito(request):
 def itens(request):
     if request.method == "POST":
         if not can_manage_items(request.user):
-            messages.error(request, "Somente Dono ou Coordenador cadastra itens.")
+            messages.error(request, "Somente Dono ou Gerente cadastra itens.")
             return redirect("itens")
         form = ItemForm(request.POST)
         if form.is_valid():
@@ -203,12 +212,7 @@ def itens(request):
     if categoria:
         itens_query = itens_query.filter(categoria=categoria)
 
-    categorias = (
-        Item.objects.exclude(categoria="")
-        .values_list("categoria", flat=True)
-        .distinct()
-        .order_by("categoria")
-    )
+    categorias = available_categories()
 
     context = {
         **role_context(request),
@@ -217,15 +221,55 @@ def itens(request):
         "busca": busca,
         "categoria_selecionada": categoria,
         "categorias": categorias,
+        "categoria_form": CategoriaForm(),
     }
     return render(request, "core/itens.html", context)
+
+
+def available_categories():
+    saved = {category.nome: category for category in Categoria.objects.all()}
+    for name, _label in DEFAULT_CATEGORIAS:
+        saved.setdefault(name, Categoria(nome=name, emoji=default_category_emoji(name)))
+    product_names = Item.objects.exclude(categoria="").values_list("categoria", flat=True).distinct()
+    for name in product_names:
+        saved.setdefault(name, Categoria(nome=name, emoji="🛍️"))
+    return sorted(saved.values(), key=lambda category: category.nome.casefold())
+
+
+def default_category_emoji(name):
+    return {
+        "Bebidas quentes": "☕",
+        "Bebidas frias": "🥤",
+        "Salgados": "🥐",
+        "Doces": "🍰",
+        "Lanches": "🥪",
+        "Outros": "🧺",
+    }.get(name, "🏷️")
+
+
+@login_required
+@require_POST
+def criar_categoria(request):
+    if not can_manage_items(request.user):
+        messages.error(request, "Somente Dono ou Gerente cadastra categorias.")
+        return redirect("itens")
+    form = CategoriaForm(request.POST)
+    if form.is_valid():
+        categoria = form.save(commit=False)
+        categoria.nome = categoria.nome.strip()
+        categoria.emoji = categoria.emoji.strip() or "🏷️"
+        categoria.save()
+        messages.success(request, f"Categoria {categoria.nome} adicionada. Ela já está disponível no cadastro e no caixa.")
+    else:
+        messages.error(request, "Informe um nome válido para a categoria. " + " ".join(form.errors.get("nome", [])))
+    return redirect("itens")
 
 
 @login_required
 @require_POST
 def atualizar_preco_item(request, item_id):
     if not can_manage_items(request.user):
-        messages.error(request, "Somente Dono ou Coordenador altera itens.")
+        messages.error(request, "Somente Dono ou Gerente altera itens.")
         return redirect("itens")
 
     item = get_object_or_404(Item, pk=item_id)
@@ -241,9 +285,27 @@ def atualizar_preco_item(request, item_id):
 
 @login_required
 @require_POST
+def atualizar_custo_item(request, item_id):
+    if not can_manage_items(request.user):
+        messages.error(request, "Somente Dono ou Gerente altera custos.")
+        return redirect("itens")
+
+    item = get_object_or_404(Item, pk=item_id)
+    form = ItemCustoForm(request.POST)
+    if form.is_valid():
+        item.custo = form.cleaned_data["custo"]
+        item.save(update_fields=["custo", "atualizado_em"])
+        messages.success(request, f"Custo de {item.nome} atualizado.")
+    else:
+        messages.error(request, "Informe um custo válido ou deixe o campo vazio para não controlar custo.")
+    return redirect("itens")
+
+
+@login_required
+@require_POST
 def atualizar_estoque_item(request, item_id):
     if not can_manage_items(request.user):
-        messages.error(request, "Somente Dono ou Coordenador altera estoque.")
+        messages.error(request, "Somente Dono ou Gerente altera estoque.")
         return redirect("itens")
 
     item = get_object_or_404(Item, pk=item_id)
@@ -261,7 +323,7 @@ def atualizar_estoque_item(request, item_id):
 @require_POST
 def excluir_item(request, item_id):
     if not can_manage_items(request.user):
-        messages.error(request, "Somente Dono ou Coordenador exclui itens.")
+        messages.error(request, "Somente Dono ou Gerente exclui itens.")
         return redirect("itens")
 
     item = get_object_or_404(Item, pk=item_id)
@@ -281,10 +343,14 @@ def vendas(request):
     if request.method == "POST":
         return criar_venda(request)
 
-    categorias = [value for value, _label in Item.CATEGORIAS]
+    categorias = available_categories()
+    emojis = {category.nome: category.emoji for category in categorias}
+    produtos = Item.objects.filter(ativo=True).order_by("categoria", "nome")
+    for item in produtos:
+        item.categoria_emoji = emojis.get(item.categoria) or default_category_emoji(item.categoria)
     context = {
         **role_context(request),
-        "itens": Item.objects.filter(ativo=True).order_by("categoria", "nome"),
+        "itens": produtos,
         "categorias": categorias,
     }
     return render(request, "core/vendas.html", context)
@@ -329,13 +395,30 @@ def criar_venda(request):
         messages.error(request, "Selecione pelo menos um item para vender.")
         return redirect("vendas")
 
+    try:
+        desconto = Decimal(request.POST.get("desconto", "0").replace(",", ".") or "0")
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Informe um desconto válido.")
+        return redirect("vendas")
+    motivo_desconto = request.POST.get("desconto_motivo", "").strip()
+    if (
+        not desconto.is_finite()
+        or desconto < 0
+        or desconto > Decimal("99999999.99")
+        or desconto.as_tuple().exponent < -2
+        or len(motivo_desconto) > 180
+        or (desconto > 0 and not motivo_desconto)
+    ):
+        messages.error(request, "O desconto deve ser válido e, quando maior que zero, precisa de uma justificativa.")
+        return redirect("vendas")
+
     with transaction.atomic():
         itens = list(Item.objects.select_for_update().filter(pk__in=itens_selecionados, ativo=True).order_by("pk"))
         if len(itens) != len(itens_selecionados):
             messages.error(request, "Um produto ficou indisponível. Revise a venda e tente novamente.")
             return redirect("vendas")
         linhas = []
-        total = Decimal("0.00")
+        subtotal = Decimal("0.00")
         for item in itens:
             try:
                 quantidade = int(request.POST.get(f"quantidade_{item.pk}", "1") or 1)
@@ -344,43 +427,60 @@ def criar_venda(request):
             if quantidade < 1 or quantidade > item.estoque:
                 messages.error(request, f"Quantidade inválida para {item.nome}; estoque disponível: {item.estoque}.")
                 return redirect("vendas")
-            subtotal = item.preco * quantidade
-            total += subtotal
-            linhas.append((item, quantidade, subtotal))
+            linha_subtotal = item.preco * quantidade
+            subtotal += linha_subtotal
+            linhas.append((item, "", quantidade, item.preco, item.custo, linha_subtotal))
 
-        total_avulsos = sum((preco * quantidade for _descricao, preco, quantidade in avulsos), Decimal("0.00"))
-        total += total_avulsos
+        for descricao, preco, quantidade in avulsos:
+            linhas.append((None, descricao, quantidade, preco, None, preco * quantidade))
+            subtotal += preco * quantidade
+
+        if subtotal > Decimal("99999999.99"):
+            messages.error(request, "O subtotal excede o limite permitido para uma venda.")
+            return redirect("vendas")
+        if desconto > subtotal:
+            messages.error(request, "O desconto não pode ser maior que o subtotal da venda.")
+            return redirect("vendas")
+        total = subtotal - desconto
         if total > Decimal("99999999.99"):
             messages.error(request, "O total excede o limite permitido para uma venda.")
             return redirect("vendas")
 
+        descontos_linhas = []
+        desconto_restante = desconto
+        for index, linha in enumerate(linhas):
+            if index == len(linhas) - 1:
+                desconto_linha = desconto_restante
+            else:
+                desconto_linha = (desconto * linha[5] / subtotal).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+                desconto_restante -= desconto_linha
+            descontos_linhas.append(desconto_linha)
+
         venda = Venda.objects.create(
             atendente=request.user,
+            subtotal=subtotal,
+            desconto=desconto,
             total=total,
+            desconto_aplicado_por=request.user if desconto > 0 else None,
+            desconto_motivo=motivo_desconto if desconto > 0 else "",
             forma_pagamento=forma_pagamento,
         )
 
-        for item, quantidade, subtotal in linhas:
+        for (item, descricao, quantidade, preco, custo, linha_subtotal), desconto_linha in zip(linhas, descontos_linhas):
             VendaItem.objects.create(
                 venda=venda,
                 item=item,
-                quantidade=quantidade,
-                valor_unitario=item.preco,
-                subtotal=subtotal,
-            )
-            item.estoque -= quantidade
-            item.save(update_fields=["estoque", "atualizado_em"])
-
-        for descricao, preco, quantidade in avulsos:
-            VendaItem.objects.create(
-                venda=venda,
-                item=None,
-                avulso=True,
+                avulso=item is None,
                 descricao_avulso=descricao,
                 quantidade=quantidade,
                 valor_unitario=preco,
-                subtotal=preco * quantidade,
+                custo_unitario=custo,
+                subtotal=linha_subtotal,
+                desconto=desconto_linha,
             )
+            if item is not None:
+                item.estoque -= quantidade
+                item.save(update_fields=["estoque", "atualizado_em"])
 
     messages.success(request, "Venda registrada com sucesso.")
     return redirect("vendas")
@@ -394,22 +494,32 @@ def decode_camera_photo(data_url: str) -> ContentFile | None:
 
 
 @login_required
+@manager_or_owner_required
 def relatorios(request):
-    hoje = timezone.localdate()
-    data_inicio = parse_date(request.GET.get("data_inicio", "")) or hoje.replace(day=1)
-    data_fim = parse_date(request.GET.get("data_fim", "")) or hoje
-    if data_inicio > data_fim:
-        data_inicio, data_fim = data_fim, data_inicio
+    data_inicio, data_fim = _periodo_relatorio(request)
     vendas_periodo = Venda.objects.filter(
         criado_em__date__gte=data_inicio,
         criado_em__date__lte=data_fim,
         status="concluida",
     )
     formas_pagamento = list(Venda.PAGAMENTOS) + [("cartao_historico", "Cartão (registro antigo)")]
+    resultado_custo = VendaItem.objects.filter(venda__in=vendas_periodo, custo_unitario__isnull=False).annotate(
+        receita_liquida_linha=F("subtotal") - F("desconto"),
+        custo_linha=F("custo_unitario") * F("quantidade"),
+    ).aggregate(receita=Sum("receita_liquida_linha"), custo=Sum("custo_linha"))
+    receita_com_custo = resultado_custo["receita"] or Decimal("0.00")
+    custo_vendido = resultado_custo["custo"] or Decimal("0.00")
+    lucro_bruto = receita_com_custo - custo_vendido
+    margem_bruta = (lucro_bruto * Decimal("100") / receita_com_custo) if receita_com_custo else None
+    linhas_sem_custo = VendaItem.objects.filter(
+        venda__in=vendas_periodo,
+        custo_unitario__isnull=True,
+    ).count()
+
     context = {
         **role_context(request),
-        "vendas": vendas_periodo.select_related("atendente")[:100],
-        "vendas_canceladas": Venda.objects.select_related("atendente").filter(
+        "vendas": vendas_periodo.select_related("atendente", "desconto_aplicado_por")[:100],
+        "vendas_canceladas": Venda.objects.select_related("atendente", "desconto_aplicado_por").filter(
             criado_em__date__gte=data_inicio,
             criado_em__date__lte=data_fim,
             status="cancelada",
@@ -417,7 +527,14 @@ def relatorios(request):
         "data_inicio": data_inicio,
         "data_fim": data_fim,
         "total_periodo": vendas_periodo.aggregate(total=Sum("total"))["total"] or 0,
+        "subtotal_periodo": vendas_periodo.aggregate(total=Sum("subtotal"))["total"] or Decimal("0.00"),
+        "desconto_periodo": vendas_periodo.aggregate(total=Sum("desconto"))["total"] or Decimal("0.00"),
         "quantidade_vendas": vendas_periodo.count(),
+        "receita_com_custo": receita_com_custo,
+        "custo_vendido": custo_vendido,
+        "lucro_bruto": lucro_bruto,
+        "margem_bruta": margem_bruta,
+        "linhas_sem_custo": linhas_sem_custo,
         "pagamentos_periodo": [
             {"nome": label, "total": vendas_periodo.filter(forma_pagamento=value).aggregate(total=Sum("total"))["total"] or 0}
             for value, label in formas_pagamento
@@ -429,8 +546,8 @@ def relatorios(request):
                     default=F("item__nome"),
                     output_field=CharField(),
                 )
-            ).values("nome")
-            .annotate(quantidade=Sum("quantidade"), receita=Sum("subtotal"))
+            ).annotate(receita_liquida_linha=F("subtotal") - F("desconto")).values("nome")
+            .annotate(quantidade=Sum("quantidade"), receita=Sum("receita_liquida_linha"))
             .order_by("-quantidade")[:10]
         ),
         "lista_compras": Item.objects.filter(ativo=True, estoque__lte=F("estoque_minimo")).order_by("estoque"),
@@ -438,8 +555,152 @@ def relatorios(request):
     return render(request, "core/relatorios.html", context)
 
 
+def _periodo_relatorio(request):
+    hoje = timezone.localdate()
+    data_inicio = parse_date(request.GET.get("data_inicio", "")) or hoje.replace(day=1)
+    data_fim = parse_date(request.GET.get("data_fim", "")) or hoje
+    if data_inicio > data_fim:
+        data_inicio, data_fim = data_fim, data_inicio
+    return data_inicio, data_fim
+
+
+def _csv_safe(value):
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    if isinstance(value, Decimal):
+        return format(value, ".2f").replace(".", ",")
+    if value is None:
+        return ""
+    return value
+
+
+def _csv_response(filename, headers, rows):
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.write("\ufeff")
+    writer = csv.writer(response, delimiter=";", lineterminator="\r\n")
+    writer.writerow([_csv_safe(value) for value in headers])
+    for row in rows:
+        writer.writerow([_csv_safe(value) for value in row])
+    return response
+
+
+def _filename_periodo(data_inicio, data_fim):
+    return f"{data_inicio.isoformat()}_{data_fim.isoformat()}"
+
+
+@login_required
+@manager_or_owner_required
+def exportar_vendas_csv(request):
+    data_inicio, data_fim = _periodo_relatorio(request)
+    vendas_periodo = Venda.objects.filter(
+        criado_em__date__gte=data_inicio,
+        criado_em__date__lte=data_fim,
+    ).select_related("atendente", "desconto_aplicado_por").prefetch_related("itens__item")
+
+    def linhas_csv():
+        for venda in vendas_periodo.order_by("criado_em", "pk"):
+            itens_venda = list(venda.itens.all())
+            dados_venda = (
+                venda.pk,
+                timezone.localtime(venda.criado_em).strftime("%d/%m/%Y %H:%M"),
+                venda.get_status_display(),
+                venda.get_forma_pagamento_display(),
+                venda.atendente.get_full_name() or venda.atendente.username,
+                venda.subtotal,
+                venda.desconto,
+                venda.total,
+                (venda.desconto_aplicado_por.get_full_name() or venda.desconto_aplicado_por.username)
+                if venda.desconto_aplicado_por_id else "",
+                venda.desconto_motivo,
+            )
+            if not itens_venda:
+                yield (*dados_venda, "", "", "", "", "", "", "", "", "")
+                continue
+            for linha in itens_venda:
+                nome = linha.descricao_avulso if linha.avulso else linha.item.nome
+                categoria = "Avulso" if linha.avulso else linha.item.categoria
+                custo_total = linha.custo_unitario * linha.quantidade if linha.custo_unitario is not None else None
+                lucro_linha = linha.subtotal - linha.desconto - custo_total if custo_total is not None else None
+                yield (
+                    *dados_venda,
+                    nome,
+                    categoria,
+                    linha.quantidade,
+                    linha.valor_unitario,
+                    linha.custo_unitario,
+                    linha.subtotal,
+                    linha.desconto,
+                    linha.subtotal - linha.desconto,
+                    lucro_linha,
+                )
+
+    return _csv_response(
+        f"giro-vendas-{_filename_periodo(data_inicio, data_fim)}.csv",
+        [
+            "Venda", "Data", "Status", "Pagamento", "Atendente", "Subtotal da venda", "Desconto da venda",
+            "Total líquido da venda", "Desconto aplicado por", "Motivo do desconto", "Produto/descrição",
+            "Categoria", "Quantidade", "Preço unitário", "Custo unitário histórico", "Subtotal bruto do item",
+            "Desconto alocado ao item", "Receita líquida do item", "Lucro bruto do item",
+        ],
+        linhas_csv(),
+    )
+
+
+@login_required
+@manager_or_owner_required
+def exportar_estoque_csv(request):
+    itens = Item.objects.order_by("categoria", "nome")
+    rows = (
+        (
+            item.pk,
+            item.nome,
+            item.categoria,
+            item.estoque,
+            item.estoque_minimo,
+            item.custo,
+            item.custo * item.estoque if item.custo is not None else None,
+            "Baixo" if item.ativo and item.estoque <= item.estoque_minimo else "Ok",
+            "Ativo" if item.ativo else "Inativo",
+        )
+        for item in itens
+    )
+    return _csv_response(
+        f"giro-estoque-{timezone.localdate().isoformat()}.csv",
+        ["ID", "Produto", "Categoria", "Estoque atual", "Estoque mínimo", "Custo unitário", "Valor do estoque a custo", "Alerta", "Status"],
+        rows,
+    )
+
+
+@login_required
+@manager_or_owner_required
+def exportar_produtos_csv(request):
+    itens = Item.objects.order_by("categoria", "nome")
+    rows = (
+        (
+            item.pk,
+            item.nome,
+            item.categoria,
+            item.preco,
+            item.custo,
+            item.lucro_unitario,
+            item.margem_percentual,
+            item.estoque,
+            item.estoque_minimo,
+            "Ativo" if item.ativo else "Inativo",
+        )
+        for item in itens
+    )
+    return _csv_response(
+        f"giro-produtos-{timezone.localdate().isoformat()}.csv",
+        ["ID", "Produto", "Categoria", "Preço", "Custo", "Lucro bruto unitário", "Margem bruta (%)", "Estoque", "Estoque mínimo", "Status"],
+        rows,
+    )
+
+
 @login_required
 @require_POST
+@manager_or_owner_required
 def cancelar_venda(request, venda_id):
     with transaction.atomic():
         venda = get_object_or_404(Venda.objects.select_for_update(), pk=venda_id)

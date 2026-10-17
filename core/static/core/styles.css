@@ -117,7 +117,14 @@ nav a.active, nav a:hover { background: #1d4ed8; color: #fff; }
 .stack { align-content: start; display: grid; gap: 14px; }
 .items-layout { display: grid; gap: 18px; }
 .compact-product-form { max-width: none; }
-.product-form-grid { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(150px, 1.4fr) minmax(130px, 1fr) 76px repeat(3, minmax(88px, .7fr)) 90px minmax(140px, .9fr); }
+.category-management { display: grid; gap: 12px; }
+.category-management .panel-title-row { margin: 0; }
+.category-management .panel-title-row h2 { margin: 0; }
+.category-management .panel-title-row p { margin: 5px 0 0; }
+.category-create-form { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(180px, 1fr) 140px auto; }
+.category-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.category-chip { background: #f1f7f3; border: 1px solid #d9e9dd; border-radius: 999px; color: #234834; font-size: 13px; padding: 7px 11px; }
+.product-form-grid { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(150px, 1.4fr) minmax(130px, 1fr) 76px repeat(4, minmax(88px, .7fr)) 90px minmax(140px, .9fr); }
 .product-form-grid label { font-size: 13px; }
 .product-check-field { align-self: center; padding-bottom: 8px; }
 .split { align-items: start; display: grid; gap: 18px; grid-template-columns: minmax(280px, 380px) 1fr; }
@@ -245,6 +252,8 @@ button:hover:not(:disabled), .button:hover { box-shadow: 0 5px 14px rgba(18, 53,
 .adhoc-panel label { font-size: 12px; }
 .adhoc-panel input { min-width: 0; }
 .report-period-form { align-items: end; display: grid; gap: 12px; grid-template-columns: 180px 180px auto 1fr; }
+.report-exports h2 { margin-bottom: 6px; }
+.report-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .mobile-cart-bar { display: none; }
 
 @media (max-width: 1000px) {
@@ -278,7 +287,7 @@ button:hover:not(:disabled), .button:hover { box-shadow: 0 5px 14px rgba(18, 53,
   .sidebar { height: auto; position: static; gap: 16px; }
   nav { grid-template-columns: repeat(2, 1fr); }
   .metrics, .split, .sale-form, .report-grid { grid-template-columns: 1fr; }
-  .filter-form, .price-form, .sale-picker, .product-form-grid { grid-template-columns: 1fr; }
+  .filter-form, .price-form, .sale-picker, .product-form-grid, .category-create-form { grid-template-columns: 1fr; }
   .page-header { align-items: flex-start; flex-direction: column; }
 }
 

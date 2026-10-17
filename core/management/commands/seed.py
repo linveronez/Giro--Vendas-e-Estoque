@@ -4,7 +4,7 @@ from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
-from core.models import Item
+from core.models import Categoria, Item
 
 
 class Command(BaseCommand):
@@ -31,35 +31,43 @@ class Command(BaseCommand):
             return
 
         products = [
-            ("Café coado", "Bebidas quentes", "☕", "3.00", 40, 10),
-            ("Cappuccino", "Bebidas quentes", "☕", "5.50", 25, 8),
-            ("Chocolate quente", "Bebidas quentes", "🍫", "6.00", 20, 8),
-            ("Chá", "Bebidas quentes", "🍵", "3.50", 4, 10),
-            ("Coca-Cola lata", "Bebidas frias", "🥤", "6.00", 36, 12),
-            ("Guaraná lata", "Bebidas frias", "🥤", "5.50", 24, 12),
-            ("Suco de laranja", "Bebidas frias", "🍊", "5.00", 18, 6),
-            ("Água mineral", "Bebidas frias", "💧", "3.00", 50, 15),
-            ("Coxinha", "Salgados", "🍗", "7.00", 22, 10),
-            ("Pão de queijo", "Salgados", "🧀", "4.00", 30, 10),
-            ("Esfiha de carne", "Salgados", "🥙", "6.50", 3, 8),
-            ("Empada", "Salgados", "🥧", "6.00", 14, 5),
-            ("Brigadeiro", "Doces", "🍫", "3.00", 30, 10),
-            ("Brownie", "Doces", "🍰", "6.50", 12, 5),
-            ("Barra de cereal", "Doces", "🌾", "3.50", 20, 6),
-            ("Bala", "Doces", "🍬", "0.50", 100, 30),
-            ("Misto quente", "Lanches", "🥪", "9.00", 10, 4),
-            ("Pão na chapa", "Lanches", "🍞", "5.00", 15, 5),
-            ("Sanduíche natural", "Lanches", "🥗", "10.00", 0, 3),
+            ("Café coado", "Bebidas quentes", "☕", "3.00", "1.00", 40, 10),
+            ("Cappuccino", "Bebidas quentes", "☕", "5.50", "2.25", 25, 8),
+            ("Chocolate quente", "Bebidas quentes", "🍫", "6.00", "2.50", 20, 8),
+            ("Chá", "Bebidas quentes", "🍵", "3.50", "0.90", 4, 10),
+            ("Coca-Cola lata", "Bebidas frias", "🥤", "6.00", "3.30", 36, 12),
+            ("Guaraná lata", "Bebidas frias", "🥤", "5.50", "3.00", 24, 12),
+            ("Suco de laranja", "Bebidas frias", "🍊", "5.00", "2.00", 18, 6),
+            ("Água mineral", "Bebidas frias", "💧", "3.00", "0.90", 50, 15),
+            ("Coxinha", "Salgados", "🍗", "7.00", "3.00", 22, 10),
+            ("Pão de queijo", "Salgados", "🧀", "4.00", "1.50", 30, 10),
+            ("Esfiha de carne", "Salgados", "🥙", "6.50", "2.75", 3, 8),
+            ("Empada", "Salgados", "🥧", "6.00", "2.50", 14, 5),
+            ("Brigadeiro", "Doces", "🍫", "3.00", "1.00", 30, 10),
+            ("Brownie", "Doces", "🍰", "6.50", "2.25", 12, 5),
+            ("Barra de cereal", "Doces", "🌾", "3.50", "2.00", 20, 6),
+            ("Bala", "Doces", "🍬", "0.50", "0.15", 100, 30),
+            ("Misto quente", "Lanches", "🥪", "9.00", "4.00", 10, 4),
+            ("Pão na chapa", "Lanches", "🍞", "5.00", "1.75", 15, 5),
+            ("Sanduíche natural", "Lanches", "🥗", "10.00", "4.50", 0, 3),
         ]
 
         with transaction.atomic():
-            for nome, categoria, emoji, preco, estoque_inicial, minimo in products:
+            if not postgres:
+                legacy_manager = User.objects.filter(username="coordenador").first()
+                if legacy_manager and not User.objects.filter(username="gerente").exists():
+                    legacy_manager.username = "gerente"
+                    legacy_manager.first_name = "Gerente"
+                    legacy_manager.save(update_fields=["username", "first_name"])
+
+            for nome, categoria, emoji, preco, custo, estoque_inicial, minimo in products:
                 item, created = Item.objects.get_or_create(
                     nome=nome,
                     defaults={
                         "categoria": categoria,
                         "emoji": emoji,
                         "preco": preco,
+                        "custo": custo,
                         "estoque": estoque_inicial,
                         "estoque_minimo": minimo,
                     },
@@ -70,11 +78,28 @@ class Command(BaseCommand):
                 item.categoria = categoria
                 item.emoji = emoji
                 item.preco = preco
+                item.custo = custo
                 item.estoque_minimo = minimo
                 item.ativo = True
                 if reset_stock or not item.vendaitem_set.exists():
                     item.estoque = estoque_inicial
                 item.save()
+
+            category_emojis = {
+                "Bebidas quentes": "☕",
+                "Bebidas frias": "🥤",
+                "Salgados": "🥐",
+                "Doces": "🍰",
+                "Lanches": "🥪",
+                "Outros": "🧺",
+            }
+            category_names = set(Item.objects.exclude(categoria="").values_list("categoria", flat=True))
+            category_names.update(category_emojis)
+            for name in category_names:
+                Categoria.objects.get_or_create(
+                    nome=name,
+                    defaults={"emoji": category_emojis.get(name, "🏷️")},
+                )
 
             self._remove_legacy_products(("Refrigerante lata", "Suco natural", "Cookie", "Bolo do dia"))
             if postgres:
@@ -113,7 +138,7 @@ class Command(BaseCommand):
     def _seed_local_users(self):
         users = [
             ("Dono", "dono", True),
-            ("Coordenador", "coordenador", False),
+            ("Gerente", "gerente", False),
             ("Atendente", "atendente", False),
         ]
         for group_name, username, is_staff in users:
