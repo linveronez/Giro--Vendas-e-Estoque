@@ -354,10 +354,6 @@ def criar_venda(request):
             messages.error(request, "O total excede o limite permitido para uma venda.")
             return redirect("vendas")
 
-        if not linhas:
-            messages.error(request, "Os itens selecionados nao estao disponiveis.")
-            return redirect("vendas")
-
         venda = Venda.objects.create(
             atendente=request.user,
             total=total,
@@ -487,20 +483,21 @@ def manifest(request):
 
 def service_worker(request):
     content = """
-const CACHE_NAME = 'cantina-pwa-v1';
-const APP_SHELL = ['/', '/static/core/styles.css', '/static/core/app.js', '/offline/'];
-
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))));
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request).then(response => response || caches.match('/offline/'))));
+  event.respondWith(fetch(event.request));
 });
 """
     return HttpResponse(content, content_type="application/javascript")

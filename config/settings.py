@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,14 +12,26 @@ def env_bool(name: str, default: bool = False) -> bool:
     return os.environ.get(name, str(default)).lower() in {"1", "true", "yes", "on"}
 
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 DEBUG = env_bool("DEBUG", True)
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("Configure SECRET_KEY no ambiente de produção.")
+    SECRET_KEY = "dev-secret-key-change-in-production"
 
 allowed_hosts = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(",") if host.strip()]
 render_external_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 if render_external_hostname:
     ALLOWED_HOSTS.append(render_external_hostname)
+csrf_trusted_origins = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if render_external_hostname:
+    csrf_trusted_origins.append(f"https://{render_external_hostname}")
+CSRF_TRUSTED_ORIGINS = csrf_trusted_origins
 if DEBUG:
     ALLOWED_HOSTS.append("testserver")
 
@@ -85,6 +98,8 @@ elif os.environ.get("POSTGRES_DB"):
         }
     }
 else:
+    if not DEBUG:
+        raise ImproperlyConfigured("Configure DATABASE_URL para usar PostgreSQL em produção.")
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
