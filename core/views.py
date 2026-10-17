@@ -1,5 +1,5 @@
 import csv
-from decimal import Decimal, InvalidOperation, ROUND_DOWN
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 
 from django.contrib import messages
@@ -281,21 +281,14 @@ def criar_venda(request):
         messages.error(request, "Selecione pelo menos um item para vender.")
         return redirect("vendas")
 
+    desconto_recebido = request.POST.get("desconto", "0").replace(",", ".") or "0"
     try:
-        desconto = Decimal(request.POST.get("desconto", "0").replace(",", ".") or "0")
+        desconto_recebido = Decimal(desconto_recebido)
     except (InvalidOperation, TypeError, ValueError):
-        messages.error(request, "Informe um desconto válido.")
+        messages.error(request, "Descontos estão temporariamente desativados. Registre a venda sem desconto.")
         return redirect("vendas")
-    motivo_desconto = request.POST.get("desconto_motivo", "").strip()
-    if (
-        not desconto.is_finite()
-        or desconto < 0
-        or desconto > Decimal("99999999.99")
-        or desconto.as_tuple().exponent < -2
-        or len(motivo_desconto) > 180
-        or (desconto > 0 and not motivo_desconto)
-    ):
-        messages.error(request, "O desconto deve ser válido e, quando maior que zero, precisa de uma justificativa.")
+    if not desconto_recebido.is_finite() or desconto_recebido != 0:
+        messages.error(request, "Descontos estão temporariamente desativados. Registre a venda sem desconto.")
         return redirect("vendas")
 
     with transaction.atomic():
@@ -324,35 +317,19 @@ def criar_venda(request):
         if subtotal > Decimal("99999999.99"):
             messages.error(request, "O subtotal excede o limite permitido para uma venda.")
             return redirect("vendas")
-        if desconto > subtotal:
-            messages.error(request, "O desconto não pode ser maior que o subtotal da venda.")
-            return redirect("vendas")
-        total = subtotal - desconto
+        total = subtotal
         if total > Decimal("99999999.99"):
             messages.error(request, "O total excede o limite permitido para uma venda.")
             return redirect("vendas")
 
-        descontos_linhas = []
-        desconto_restante = desconto
-        for index, linha in enumerate(linhas):
-            if index == len(linhas) - 1:
-                desconto_linha = desconto_restante
-            else:
-                desconto_linha = (desconto * linha[5] / subtotal).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-                desconto_restante -= desconto_linha
-            descontos_linhas.append(desconto_linha)
-
         venda = Venda.objects.create(
             atendente=request.user,
             subtotal=subtotal,
-            desconto=desconto,
             total=total,
-            desconto_aplicado_por=request.user if desconto > 0 else None,
-            desconto_motivo=motivo_desconto if desconto > 0 else "",
             forma_pagamento=forma_pagamento,
         )
 
-        for (item, descricao, quantidade, preco, custo, linha_subtotal), desconto_linha in zip(linhas, descontos_linhas):
+        for item, descricao, quantidade, preco, custo, linha_subtotal in linhas:
             VendaItem.objects.create(
                 venda=venda,
                 item=item,
@@ -362,7 +339,6 @@ def criar_venda(request):
                 valor_unitario=preco,
                 custo_unitario=custo,
                 subtotal=linha_subtotal,
-                desconto=desconto_linha,
             )
             if item is not None:
                 item.estoque -= quantidade

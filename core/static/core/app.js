@@ -9,10 +9,6 @@ if (saleForm) {
   const hiddenInputs = document.querySelector("[data-sale-hidden]");
   const emptyCart = document.querySelector("[data-sale-empty]");
   const totalElement = document.querySelector("[data-sale-total]");
-  const subtotalElement = document.querySelector("[data-sale-subtotal]");
-  const discountInput = document.querySelector("[data-sale-discount]");
-  const discountTotalElement = document.querySelector("[data-sale-discount-total]");
-  const discountReasonInput = document.querySelector("[data-sale-discount-reason]");
   const cartCount = document.querySelector("[data-cart-count]");
   const checkout = document.querySelector("[data-checkout]");
   const adHocPanel = document.querySelector("[data-adhoc-panel]");
@@ -105,24 +101,8 @@ if (saleForm) {
       }
     });
 
-    const discount = discountInput
-      ? Math.max(0, Number(discountInput.value.replace(",", ".")) || 0)
-      : 0;
-    const appliedDiscount = Math.min(discount, subtotal);
-    const total = subtotal - appliedDiscount;
-    if (discountInput) {
-      discountInput.max = subtotal.toFixed(2);
-      discountInput.setCustomValidity(discount > subtotal ? "O desconto não pode ser maior que o subtotal." : "");
-    }
-    if (discountReasonInput) {
-      discountReasonInput.required = discount > 0;
-      discountReasonInput.setCustomValidity(
-        discount > 0 && !discountReasonInput.value.trim() ? "Informe o motivo para aplicar o desconto." : "",
-      );
-    }
+    const total = subtotal;
     const countText = `${quantityTotal} ${quantityTotal === 1 ? "item" : "itens"}`;
-    if (subtotalElement) subtotalElement.textContent = currency.format(subtotal);
-    if (discountTotalElement) discountTotalElement.textContent = currency.format(appliedDiscount);
     totalElement.textContent = currency.format(total);
     cartCount.textContent = countText;
     mobileCartCount.textContent = countText;
@@ -141,8 +121,6 @@ if (saleForm) {
   }
 
   search.addEventListener("input", filterProducts);
-  discountInput?.addEventListener("input", renderCart);
-  discountReasonInput?.addEventListener("input", renderCart);
   search.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();

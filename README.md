@@ -4,7 +4,7 @@ Sistema web acadêmico para pequenos negócios registrarem vendas e acompanharem
 
 ## Para a banca
 
-O Giro é um protótipo acadêmico de sistema web para pequenos negócios. Ele demonstra como registrar vendas, atualizar o estoque, aplicar descontos auditáveis, consultar resumo de vendas e exportar dados em CSV. Cancelar uma venda devolve as quantidades ao estoque, mas não faz reembolso financeiro. O catálogo e os registros de demonstração são fictícios.
+O Giro é um protótipo acadêmico de sistema web para pequenos negócios. Ele demonstra como registrar vendas, atualizar o estoque, consultar resumo de vendas e exportar dados em CSV. A aplicação de novos descontos foi retirada temporariamente; registros históricos permanecem preservados e visíveis. Cancelar uma venda devolve as quantidades ao estoque, mas não faz reembolso financeiro. O catálogo e os registros de demonstração são fictícios.
 
 O código Django é publicado no Render e os dados da versão online ficam no PostgreSQL do Neon. O projeto também pode ser executado localmente com SQLite. Como a hospedagem gratuita pode suspender a aplicação após um período sem acesso, o primeiro carregamento pode levar até um minuto. O manifest e o ícone permitem usar o Giro como atalho de aplicativo; as telas e os dados não ficam disponíveis sem conexão.
 
@@ -14,7 +14,7 @@ O código Django é publicado no Render e os dados da versão online ficam no Po
 
 - Cadastra produtos em categorias gerenciáveis pela tela de Produtos; categorias novas também aparecem nos filtros do Caixa.
 - Registra vendas com um ou mais produtos e pagamento em dinheiro, Pix, cartão de débito ou cartão de crédito.
-- Permite aplicar um desconto em reais por venda, com motivo obrigatório; o servidor recalcula o total e registra quem aplicou.
+- Registra vendas pelo valor integral; descontos estão temporariamente desativados. O sistema preserva eventuais descontos de vendas antigas no histórico.
 - Atualiza o estoque automaticamente e impede vender mais unidades do que estão disponíveis.
 - Guarda o custo unitário do produto no item vendido, preservando o histórico quando o custo atual muda. O Resumo calcula lucro e margem brutos usando apenas itens com custo conhecido.
 - Permite lançar um item avulso com descrição, preço e quantidade. O item aparece no histórico da venda, mas não movimenta o estoque.
@@ -82,6 +82,6 @@ Não publique a connection string, a `SECRET_KEY` ou credenciais de acesso no Gi
 4. Registre, se desejar, um item avulso para demonstrar uma venda sem movimentação de estoque.
 5. Abra **Resumo**, selecione um período, confira totais e produtos mais vendidos e cancele uma venda para mostrar a devolução do estoque.
 
-O Resumo também exibe descontos, custo dos itens com custo informado, lucro bruto e margem bruta. A margem exclui itens sem custo conhecido, como itens avulsos; ela não representa lucro líquido, pois não desconta despesas, impostos ou taxas. O cancelamento é interno ao sistema e não estorna pagamentos. Voucher e estorno financeiro não fazem parte desta versão.
+O Resumo preserva eventuais descontos históricos e exibe custo dos itens com custo informado, lucro bruto e margem bruta. A margem exclui itens sem custo conhecido, como itens avulsos; ela não representa lucro líquido, pois não desconta despesas, impostos ou taxas. O cancelamento é interno ao sistema e não estorna pagamentos. Voucher e estorno financeiro não fazem parte desta versão.
 
 Este projeto é um protótipo acadêmico. Não use dados pessoais ou financeiros reais.

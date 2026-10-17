@@ -251,7 +251,7 @@ class V02ControlsTests(TestCase):
         attendant_sale.refresh_from_db()
         self.assertEqual(attendant_sale.status, "concluida")
 
-    def test_desconto_e_custo_historico_calculam_lucro_e_margem(self):
+    def test_venda_sem_desconto_preserva_custo_historico_e_calcula_lucro_e_margem(self):
         self.client.force_login(self.owner)
         response = self.client.post(
             reverse("vendas"),
@@ -259,26 +259,24 @@ class V02ControlsTests(TestCase):
                 "forma_pagamento": "pix",
                 "itens": [str(self.item.pk)],
                 f"quantidade_{self.item.pk}": "2",
-                "desconto": "1.00",
-                "desconto_motivo": "Promoção de teste",
             },
         )
         self.assertEqual(response.status_code, 302)
         sale = Venda.objects.get()
         line = VendaItem.objects.get(venda=sale)
         self.assertEqual(sale.subtotal, Decimal("7.00"))
-        self.assertEqual(sale.desconto, Decimal("1.00"))
-        self.assertEqual(sale.total, Decimal("6.00"))
-        self.assertEqual(sale.desconto_aplicado_por, self.owner)
-        self.assertEqual(sale.desconto_motivo, "Promoção de teste")
+        self.assertEqual(sale.desconto, Decimal("0.00"))
+        self.assertEqual(sale.total, Decimal("7.00"))
+        self.assertIsNone(sale.desconto_aplicado_por)
+        self.assertEqual(sale.desconto_motivo, "")
         self.assertEqual(line.custo_unitario, Decimal("1.25"))
-        self.assertEqual(line.desconto, Decimal("1.00"))
+        self.assertEqual(line.desconto, Decimal("0.00"))
         report = self.client.get(reverse("relatorios"))
-        self.assertEqual(report.context["desconto_periodo"], Decimal("1.00"))
-        self.assertEqual(report.context["lucro_bruto"], Decimal("3.50"))
-        self.assertAlmostEqual(float(report.context["margem_bruta"]), 58.33, places=2)
+        self.assertEqual(report.context["desconto_periodo"], Decimal("0.00"))
+        self.assertEqual(report.context["lucro_bruto"], Decimal("4.50"))
+        self.assertAlmostEqual(float(report.context["margem_bruta"]), 64.29, places=2)
 
-    def test_desconto_acima_do_subtotal_ou_sem_motivo_e_recusado(self):
+    def test_novos_descontos_sao_recusados(self):
         self.client.force_login(self.owner)
         base = {"forma_pagamento": "dinheiro", "itens": [str(self.item.pk)]}
         payloads = (
