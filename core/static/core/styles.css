@@ -74,6 +74,7 @@ td small { display: block; margin-top: 3px; }
 .login-form input { border-radius: 10px; min-height: 48px; }
 .login-form button { background: #16804b; border-radius: 10px; gap: 10px; margin-top: 4px; min-height: 50px; }
 .login-form button:hover { background: #11683d; }
+.login-inactivity-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: -8px 0 0; text-align: center; }
 .login-panel .alert { border-radius: 10px; font-size: 13px; line-height: 1.5; padding: 12px 14px; }
 .login-logo { width: 154px; height: auto; }
 .demo-box { background: #f8fbff; border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 4px; padding: 12px; }

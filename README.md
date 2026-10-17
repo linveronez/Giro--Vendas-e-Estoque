@@ -2,6 +2,12 @@
 
 Sistema web acadêmico para pequenos negócios registrarem vendas e acompanharem o estoque. A tela de caixa permite buscar produtos pelo nome ou filtrar por categoria, montar uma venda com poucos toques e conferir o total por forma de pagamento.
 
+## Para a banca
+
+O Giro é um protótipo acadêmico de sistema web para pequenos negócios. Ele demonstra como registrar vendas, atualizar o estoque, cancelar uma venda com devolução das quantidades e consultar um resumo por período e forma de pagamento. O catálogo e os registros de demonstração são fictícios.
+
+O código Django é publicado no Render e os dados da versão online ficam no PostgreSQL do Neon. O projeto também pode ser executado localmente com SQLite. Como a hospedagem gratuita pode suspender a aplicação após um período sem acesso, o primeiro carregamento pode levar até um minuto. O manifest e o ícone permitem usar o Giro como atalho de aplicativo; as telas e os dados não ficam disponíveis sem conexão.
+
 **Repositório:** [github.com/linveronez/Giro--Vendas-e-Estoque](https://github.com/linveronez/Giro--Vendas-e-Estoque)
 
 ## O que o sistema faz
@@ -36,9 +42,11 @@ python manage.py seed
 python manage.py runserver
 ```
 
-Abra <http://127.0.0.1:8000>. Em uma base local nova, `seed` cria o catálogo de demonstração e os usuários `dono`, `coordenador` e `atendente`, todos com senha `123456`. Essas credenciais são somente para desenvolvimento local; não as use no serviço publicado.
+Abra <http://127.0.0.1:8000>. Em SQLite, `seed` cria o catálogo de demonstração e os usuários locais `dono`, `coordenador` e `atendente` (senha `123456`). Essas credenciais servem apenas para desenvolvimento local.
 
-O seed inclui produtos em estoque baixo de propósito e um produto esgotado para demonstrar os alertas e o bloqueio de venda. Ele preserva a quantidade de estoque de produtos que já tenham vendas registradas.
+O seed é idempotente: pode ser repetido sem duplicar produtos ou usuários. O catálogo inclui produtos em estoque baixo e um esgotado para demonstrar os alertas e o bloqueio de venda. Sem `--reset-stock`, ele preserva o estoque atual dos produtos que já tenham vendas. Para restaurar os estoques iniciais, execute `python manage.py seed --reset-stock` e confirme digitando `RESETAR`; isso também afeta produtos que já tenham histórico de vendas.
+
+Em PostgreSQL, o seed não cria os usuários locais nem usa senha fixa. Configure `DEMO_PASSWORD` no ambiente antes de executar `python manage.py seed`; sem essa variável, o comando falha antes de alterar dados. Ele cria ou atualiza apenas o usuário `demo` com a senha fornecida pelo ambiente.
 
 ## Publicar no Render com PostgreSQL do Neon
 
