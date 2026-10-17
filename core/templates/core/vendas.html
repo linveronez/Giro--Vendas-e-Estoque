@@ -1,69 +1,85 @@
 {% extends "core/base.html" %}
 {% load currency %}
-{% block title %}Vendas | Sistema de Cantina{% endblock %}
+{% block title %}Caixa | Giro{% endblock %}
 {% block content %}
-<header class="page-header">
+<header class="page-header sale-page-header">
   <div>
-    <p class="eyebrow">Operação</p>
+    <p class="eyebrow">🧾 Caixa rápido</p>
     <h1>Nova venda</h1>
+    <p class="muted">Encontre os produtos por categoria ou digite o nome.</p>
   </div>
+  <a class="ghost-button" href="{% url 'itens' %}">＋ Adicionar produtos</a>
 </header>
 
-<form class="panel sale-form" method="post" data-sale-form>
+<form class="pos-layout" method="post" data-sale-form>
   {% csrf_token %}
-  <section class="stack">
-    <label>Cliente
-      <select name="cliente" required data-client-select>
-        {% for cliente in clientes %}
-          <option value="{{ cliente.id }}" data-balance="{{ cliente.credito }}" data-photo="{% if cliente.foto %}{{ cliente.foto.url }}{% endif %}" data-document="{{ cliente.documento }}">{{ cliente.nome }} - saldo {{ cliente.credito|br_money }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <div class="client-preview">
-      <div class="preview-photo" data-client-photo>Sem foto</div>
-      <div>
-        <strong>Foto cadastrada</strong>
-        <small data-client-document>Use para conferir com a foto capturada na venda.</small>
-      </div>
+  <section class="pos-catalog panel">
+    <div class="catalog-search">
+      <label for="product-search">Buscar produto</label>
+      <input id="product-search" type="search" placeholder="Ex.: café, coxinha, água…" autocomplete="off" data-product-search>
+      <span class="muted">Os resultados aparecem enquanto você digita.</span>
     </div>
 
-    <h2>Itens da venda</h2>
-    <div class="sale-picker">
-      <label>Produto
-        <select data-sale-item-select>
-          {% for item in itens %}
-            <option value="{{ item.id }}" data-name="{{ item.nome }}" data-price="{{ item.preco }}" data-stock="{{ item.estoque }}">{{ item.nome }} - {{ item.preco|br_money }} | estoque {{ item.estoque }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Quantidade
-        <input data-sale-item-quantity type="number" min="1" value="1">
-      </label>
-      <button type="button" data-sale-add-item {% if not itens %}disabled{% endif %}>Adicionar</button>
+    <div class="category-tabs" role="group" aria-label="Filtrar produtos por categoria">
+      <button type="button" class="category-tab active" data-category-filter="*">✨ Tudo</button>
+      {% for categoria in categorias %}
+        {% if categoria == "Bebidas quentes" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">☕ {{ categoria }}</button>
+        {% elif categoria == "Bebidas frias" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥤 {{ categoria }}</button>
+        {% elif categoria == "Salgados" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥐 {{ categoria }}</button>
+        {% elif categoria == "Doces" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🍰 {{ categoria }}</button>
+        {% elif categoria == "Lanches" %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🥪 {{ categoria }}</button>
+        {% else %}<button type="button" class="category-tab" data-category-filter="{{ categoria }}">🧺 {{ categoria }}</button>{% endif %}
+      {% endfor %}
     </div>
-    {% if not itens %}<p class="muted">Nenhum item disponível no estoque.</p>{% endif %}
 
-    <section class="sale-summary">
-      <h3>Itens selecionados</h3>
-      <div data-sale-empty class="muted">Nenhum item selecionado.</div>
-      <div data-sale-lines class="sale-lines"></div>
-      <div data-sale-hidden></div>
-    </section>
+    <div class="adhoc-panel" data-adhoc-panel hidden>
+      <div><strong>➕ Item avulso</strong><small>Para algo que não está cadastrado. Ele entra na venda sem alterar o estoque.</small></div>
+      <label>Descrição<input type="text" maxlength="140" placeholder="Ex.: produto especial" data-adhoc-name></label>
+      <label>Preço (R$)<input type="number" min="0.01" step="0.01" placeholder="0,00" data-adhoc-price></label>
+      <label>Qtd.<input type="number" min="1" step="1" value="1" data-adhoc-quantity></label>
+      <button type="button" data-add-adhoc>Adicionar avulso</button>
+    </div>
+
+    <div class="product-grid" data-product-grid>
+      {% for item in itens %}
+        <button type="button" class="product-card {% if item.estoque == 0 %}is-sold-out{% endif %}" data-add-product data-id="{{ item.id }}"
+          data-name="{{ item.nome }}" data-price="{{ item.preco }}" data-stock="{{ item.estoque }}"
+          data-category="{{ item.categoria|default:'Outros' }}" data-emoji="{{ item.emoji }}" {% if item.estoque == 0 %}disabled{% endif %}>
+          <span class="product-emoji" aria-hidden="true">{{ item.emoji|default:'🛍️' }}</span>
+          <span class="product-card-name">{{ item.nome }}</span>
+          <strong>{{ item.preco|br_money }}</strong>
+          {% if item.estoque == 0 %}<small class="sold-out-label">Esgotado</small>{% else %}<small>📦 {{ item.estoque }} disponíveis</small>{% endif %}
+        </button>
+      {% empty %}
+        <div class="catalog-empty">Nenhum produto disponível. <a href="{% url 'itens' %}">Cadastre o primeiro produto.</a></div>
+      {% endfor %}
+      <p class="catalog-no-results" data-no-results hidden>Nenhum produto encontrado nessa busca.</p>
+    </div>
+    <p class="catalog-hint">Não encontrou o que precisa? <a href="{% url 'itens' %}">Cadastre um produto</a> ou organize em <strong>🧺 Outros</strong>.</p>
   </section>
 
-  <aside class="camera-box">
-    <h2>Evidência por foto</h2>
-    <video id="camera" autoplay playsinline muted></video>
-    <canvas id="snapshot" width="640" height="480"></canvas>
-    <input type="hidden" name="foto_base64" id="foto_base64">
-    <div class="actions">
-      <button type="button" data-start-camera>Abrir câmera</button>
-      <button type="button" data-take-photo>Capturar</button>
+  <aside class="sale-cart panel" id="sale-cart">
+    <div class="cart-heading"><div><p class="eyebrow">🛒 Pedido atual</p><h2>Sua venda</h2></div><span class="cart-count" data-cart-count>0 itens</span></div>
+    <div class="cart-empty" data-sale-empty><span>🧺</span><strong>Seu carrinho está vazio</strong><small>Toque em um produto para começar.</small></div>
+    <div class="cart-lines" data-sale-lines></div>
+    <div data-sale-hidden></div>
+    <div class="cart-footer">
+      <label>Forma de pagamento
+        <select name="forma_pagamento" required>
+          <option value="dinheiro">💵 Dinheiro</option>
+          <option value="pix">⚡ Pix</option>
+          <option value="cartao_debito">💳 Cartão de débito</option>
+          <option value="cartao_credito">💳 Cartão de crédito</option>
+        </select>
+      </label>
+      <div class="cart-total"><span>Total</span><strong data-sale-total>R$ 0,00</strong></div>
+      <button class="checkout-button" type="submit" data-checkout disabled>✅ Finalizar venda</button>
+      <small class="cart-note">Ao finalizar, o estoque é atualizado automaticamente.</small>
     </div>
-    <div class="total-box"><span>Total estimado</span><strong data-sale-total>R$ 0,00</strong></div>
-    <div class="total-box"><span>Crédito após venda</span><strong data-sale-balance-after>R$ 0,00</strong></div>
-    <button type="submit">Finalizar venda</button>
   </aside>
 </form>
+<button class="mobile-cart-bar" type="button" data-mobile-cart-bar hidden>
+  <span><strong data-mobile-cart-count>0 itens</strong><small data-mobile-cart-total>R$ 0,00</small></span>
+  <strong>Ver venda ↓</strong>
+</button>
 {% endblock %}

@@ -1,12 +1,6 @@
-databases:
-  - name: cantina-ct-dev-db
-    plan: free
-    databaseName: cantina_ct_dev
-    user: cantina_ct_dev
-
 services:
   - type: web
-    name: cantina-ct-dev
+    name: giro-vendas-estoque
     runtime: python
     plan: free
     region: oregon
@@ -15,9 +9,7 @@ services:
     healthCheckPath: "/login/"
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: cantina-ct-dev-db
-          property: connectionString
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG

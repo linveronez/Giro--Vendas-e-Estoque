@@ -1,92 +1,70 @@
-# Sistema de Cantina - Projeto Integrador
+# Giro — Vendas e Estoque
 
-Eu desenvolvo este sistema web para controlar a operação de uma cantina institucional fictícia. A proposta resolve o cadastro de clientes, controle de crédito, cadastro de itens, registro de vendas, baixa de estoque, captura de foto no momento da venda e relatórios básicos para acompanhamento do dono.
+Sistema web acadêmico para pequenos negócios registrarem vendas e acompanharem o estoque. A tela de caixa permite buscar produtos pelo nome ou filtrar por categoria, montar uma venda com poucos toques e conferir o total por forma de pagamento.
 
-## Minha proposta
+**Repositório:** [github.com/linveronez/Giro--Vendas-e-Estoque](https://github.com/linveronez/Giro--Vendas-e-Estoque)
 
-Eu organizo o sistema em quatro áreas principais:
+## O que o sistema faz
 
-- Clientes: cadastro do acolhido/paciente, saldo de crédito e comprovante Pix opcional.
-- Itens: cadastro dos produtos da cantina, preço, estoque e estoque mínimo.
-- Vendas: seleção do cliente, seleção dos itens, cálculo automático, desconto do crédito e captura de foto pelo celular ou webcam.
-- Relatórios: vendas recentes, itens mais vendidos, clientes em débito e lista de compras baseada em estoque baixo.
+- Cadastra e organiza produtos por categorias fixas: bebidas quentes, bebidas frias, salgados, doces, lanches e outros.
+- Registra vendas com um ou mais produtos e pagamento em dinheiro, Pix, cartão de débito ou cartão de crédito.
+- Atualiza o estoque automaticamente e impede vender mais unidades do que estão disponíveis.
+- Permite lançar um item avulso com descrição, preço e quantidade. O item aparece no histórico da venda, mas não movimenta o estoque.
+- Permite cancelar uma venda, devolvendo os produtos cadastrados ao estoque.
+- Exibe resumo por período, totais por forma de pagamento, produtos mais vendidos, reposição de estoque e histórico de cancelamentos.
+- Usa dados fictícios para a demonstração. O fluxo de venda não exige cadastro de clientes nem armazena fotos ou comprovantes.
 
-## Perfis de acesso
+## Tecnologias
 
-| Perfil | O que eu permito |
-| --- | --- |
-| Dono | Acesso total, incluindo relatórios e lista de compras. |
-| Coordenador | Cadastro de clientes, créditos, itens e vendas. |
-| Atendente | Registro de vendas. |
+- Python e Django
+- SQLite para desenvolvimento local
+- PostgreSQL para hospedagem
+- HTML, CSS e JavaScript puro para a interface
 
-## Como eu executo localmente
+## Executar localmente
 
-```powershell
-.venv\Scripts\python.exe manage.py migrate
-.venv\Scripts\python.exe manage.py seed
-.venv\Scripts\python.exe manage.py runserver
-```
-
-Depois eu acesso:
-
-```text
-http://127.0.0.1:8000
-```
-
-## Usuários iniciais
-
-| Perfil | Usuário | Senha |
-| --- | --- | --- |
-| Dono | dono | 123456 |
-| Coordenador | coordenador | 123456 |
-| Atendente | atendente | 123456 |
-
-## PWA e uso no celular
-
-Eu preparo o sistema como PWA, com manifesto, service worker e layout responsivo. Assim, em um ambiente com HTTPS, o navegador do celular pode instalar o sistema como aplicativo e liberar a câmera do smartphone para capturar a foto da venda.
-
-## Banco de dados e hospedagem
-
-No desenvolvimento local eu uso SQLite para facilitar testes. Para hospedagem, deixo a configuração preparada para PostgreSQL por variáveis de ambiente:
-
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_HOST`
-- `POSTGRES_PORT`
-
-Em produção, eu também devo configurar armazenamento persistente para fotos e comprovantes, como S3, Cloudinary, Supabase Storage ou Vercel Blob.
-
-## Antes de subir no Git
-
-Eu mantenho fora do repositório os arquivos locais de execução:
-
-- `.venv/`
-- `db.sqlite3`
-- `media/`
-- `staticfiles/`
-- `.env`
-
-Para preparar a versão que vai ao Git, eu verifico:
+Requer uma versão de Python compatível com as dependências em `requirements.txt`.
 
 ```powershell
-.venv\Scripts\python.exe manage.py check
-.venv\Scripts\python.exe manage.py collectstatic --noinput
+git clone https://github.com/linveronez/Giro--Vendas-e-Estoque.git
+cd Giro--Vendas-e-Estoque
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed
+python manage.py runserver
 ```
 
-O PWA já possui:
+Abra <http://127.0.0.1:8000>. Em uma base local nova, `seed` cria o catálogo de demonstração e os usuários `dono`, `coordenador` e `atendente`, todos com senha `123456`. Essas credenciais são somente para desenvolvimento local; não as use no serviço publicado.
 
-- `manifest.webmanifest`
-- `service-worker.js`
-- logo institucional da Recomeçar
-- layout responsivo para notebook e celular
+O seed inclui produtos em estoque baixo de propósito e um produto esgotado para demonstrar os alertas e o bloqueio de venda. Ele preserva a quantidade de estoque de produtos que já tenham vendas registradas.
 
-Para testar instalação como aplicativo no celular, eu devo publicar em ambiente com HTTPS. A câmera do navegador funciona de forma mais confiável em HTTPS ou em `localhost`.
+## Publicar no Render com PostgreSQL do Neon
 
-## Marcadores para a entrega
+O arquivo `render.yaml` define o serviço web no Render, sem criar um banco temporário do próprio Render. A conexão com o PostgreSQL é fornecida pela variável secreta `DATABASE_URL`.
 
-- Eu apresento o problema: a cantina precisa controlar crédito, estoque e vendas por cliente.
-- Eu justifico a solução: o sistema reduz registros manuais, facilita auditoria e gera relatórios básicos.
-- Eu demonstro os perfis: atendente vende, coordenador controla crédito e estoque, dono acompanha relatórios.
-- Eu demonstro uma venda: seleciono cliente, itens, capturo foto e finalizo.
-- Eu mostro os impactos: saldo atualizado, estoque baixado, venda registrada e relatório alimentado.
+1. Crie um projeto PostgreSQL no Neon e copie a connection string.
+2. No Render, crie um Blueprint a partir deste repositório.
+3. Na configuração inicial do Blueprint, informe a connection string do Neon em `DATABASE_URL`. Se o serviço ou Blueprint já existir, preencha ou atualize `DATABASE_URL` manualmente na área **Environment** do serviço.
+4. Mantenha `DEBUG=False` e deixe o Render gerar `SECRET_KEY`.
+5. Faça o deploy. O comando de inicialização aplica as migrações antes de iniciar o Django.
+6. Crie um usuário de demonstração exclusivo no banco remoto pelo Shell do serviço:
+
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+Não publique a connection string, a `SECRET_KEY` ou credenciais de acesso no GitHub. O primeiro acesso ao serviço pode levar mais tempo se a aplicação estiver inativa. O banco e o serviço web podem suspender recursos em planos gratuitos; consulte os limites atuais dos provedores e mantenha um backup dos dados importantes.
+
+> No Render, variáveis `sync: false` são solicitadas na criação inicial do Blueprint. Em atualizações de um Blueprint existente, o Render não solicita novamente esse valor; configure-o diretamente no painel do serviço. [Referência oficial de Blueprints do Render](https://render.com/docs/blueprint-spec).
+
+## Roteiro de demonstração
+
+1. Abra **Produtos** e mostre o catálogo, o estoque baixo e o produto esgotado.
+2. No **Caixa**, filtre por uma categoria ou digite parte do nome. Adicione produtos e ajuste quantidades no carrinho.
+3. Escolha a forma de pagamento e finalize a venda; confira a baixa no estoque.
+4. Registre, se desejar, um item avulso para demonstrar uma venda sem movimentação de estoque.
+5. Abra **Resumo**, selecione um período, confira totais e produtos mais vendidos e cancele uma venda para mostrar a devolução do estoque.
+
+Este projeto é um protótipo acadêmico. Não use dados pessoais ou financeiros reais.

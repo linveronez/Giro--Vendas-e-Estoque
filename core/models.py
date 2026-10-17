@@ -29,8 +29,18 @@ class Cliente(models.Model):
 
 
 class Item(models.Model):
+    CATEGORIAS = [
+        ("Bebidas quentes", "Bebidas quentes"),
+        ("Bebidas frias", "Bebidas frias"),
+        ("Salgados", "Salgados"),
+        ("Doces", "Doces"),
+        ("Lanches", "Lanches"),
+        ("Outros", "Outros"),
+    ]
+
     nome = models.CharField(max_length=140)
-    categoria = models.CharField(max_length=80, blank=True)
+    categoria = models.CharField(max_length=40, choices=CATEGORIAS, default="Outros")
+    emoji = models.CharField(max_length=16, blank=True)
     preco = models.DecimalField(max_digits=10, decimal_places=2)
     estoque = models.PositiveIntegerField(default=0)
     estoque_minimo = models.PositiveIntegerField(default=5)
@@ -52,10 +62,20 @@ class Item(models.Model):
 
 
 class Venda(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="vendas")
+    PAGAMENTOS = [
+        ("dinheiro", "Dinheiro"),
+        ("pix", "Pix"),
+        ("cartao_debito", "Cartão de débito"),
+        ("cartao_credito", "Cartão de crédito"),
+    ]
+    STATUS = [("concluida", "Concluída"), ("cancelada", "Cancelada")]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="vendas", null=True, blank=True)
     atendente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vendas")
     total = models.DecimalField(max_digits=10, decimal_places=2)
-    saldo_apos_venda = models.DecimalField(max_digits=10, decimal_places=2)
+    saldo_apos_venda = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    forma_pagamento = models.CharField(max_length=20, choices=PAGAMENTOS, default="dinheiro")
+    status = models.CharField(max_length=20, choices=STATUS, default="concluida")
     foto = models.FileField(upload_to="vendas/", blank=True, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -67,10 +87,17 @@ class Venda(models.Model):
     def __str__(self) -> str:
         return f"Venda #{self.pk} - {self.cliente}"
 
+    def get_forma_pagamento_display(self) -> str:
+        if self.forma_pagamento in {"cartao", "cartao_historico"}:
+            return "Cartão (registro antigo)"
+        return dict(self.PAGAMENTOS).get(self.forma_pagamento, self.forma_pagamento)
+
 
 class VendaItem(models.Model):
     venda = models.ForeignKey(Venda, on_delete=models.CASCADE, related_name="itens")
-    item = models.ForeignKey(Item, on_delete=models.PROTECT)
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True)
+    avulso = models.BooleanField(default=False)
+    descricao_avulso = models.CharField(max_length=140, blank=True)
     quantidade = models.PositiveIntegerField()
     valor_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
@@ -80,7 +107,8 @@ class VendaItem(models.Model):
         verbose_name_plural = "itens da venda"
 
     def __str__(self) -> str:
-        return f"{self.quantidade}x {self.item}"
+        nome = self.descricao_avulso if self.avulso else self.item
+        return f"{self.quantidade}x {nome}"
 
 
 class MovimentoCredito(models.Model):

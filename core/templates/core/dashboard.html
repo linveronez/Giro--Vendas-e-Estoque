@@ -1,31 +1,31 @@
 {% extends "core/base.html" %}
 {% load currency %}
-{% block title %}Painel | Sistema de Cantina{% endblock %}
+{% block title %}Início | Giro{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Visão geral</p>
-    <h1>Painel da cantina</h1>
+    <p class="eyebrow">👋 Olá, vamos vender?</p>
+    <h1>Visão geral</h1>
   </div>
-  <a class="button" href="{% url 'vendas' %}">Nova venda</a>
+  <a class="button" href="{% url 'vendas' %}">🧾 Iniciar venda</a>
 </header>
 
 <section class="metrics">
-  <article><span>Clientes</span><strong>{{ clientes_total }}</strong></article>
-  <article><span>Itens ativos</span><strong>{{ itens_total }}</strong></article>
-  <article><span>Estoque baixo</span><strong>{{ estoque_baixo_total }}</strong></article>
-  <article><span>Vendas registradas</span><strong>{{ vendas_total|br_money }}</strong></article>
+  <article><span>📦 Produtos ativos</span><strong>{{ itens_total }}</strong></article>
+  <article><span>⚠️ Estoque baixo</span><strong>{{ estoque_baixo_total }}</strong></article>
+  <article><span>💰 Vendas de hoje</span><strong>{{ vendas_total|br_money }}</strong></article>
+  <article><span>✨ Operação</span><strong class="metric-word">Em dia</strong></article>
 </section>
 
 <section class="panel">
-  <h2>Últimas vendas</h2>
+  <h2>🧾 Últimas vendas</h2>
   <table>
-    <thead><tr><th>Venda</th><th>Cliente</th><th>Total</th><th>Atendente</th><th>Data</th></tr></thead>
+    <thead><tr><th>Venda</th><th>Pagamento</th><th>Total</th><th>Atendente</th><th>Data</th></tr></thead>
     <tbody>
       {% for venda in ultimas_vendas %}
         <tr>
           <td data-label="Venda">#{{ venda.id }}</td>
-          <td data-label="Cliente">{{ venda.cliente.nome }}</td>
+          <td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td>
           <td data-label="Total">{{ venda.total|br_money }}</td>
           <td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td>
           <td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td>

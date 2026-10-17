@@ -1,11 +1,11 @@
 {% extends "core/base.html" %}
 {% load currency %}
-{% block title %}Itens | Sistema de Cantina{% endblock %}
+{% block title %}Produtos | Giro{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Estoque</p>
-    <h1>Itens</h1>
+    <p class="eyebrow">📦 Catálogo e estoque</p>
+    <h1>Produtos</h1>
   </div>
 </header>
 
@@ -13,7 +13,7 @@
   <form class="panel stack compact-product-form" method="post">
     {% csrf_token %}
     <div class="panel-title-row">
-      <h2>Adicionar novo produto</h2>
+      <h2>✨ Adicionar produto</h2>
     </div>
     <div class="product-form-grid">
       {% for field in form %}
@@ -29,7 +29,7 @@
 
   <section class="panel">
     <div class="panel-title-row">
-      <h2>Itens cadastrados</h2>
+      <h2>Produtos cadastrados</h2>
       <form class="filter-form" method="get">
         <input name="busca" value="{{ busca }}" placeholder="Filtrar por nome">
         <select name="categoria">
@@ -47,7 +47,7 @@
       <tbody>
         {% for item in itens %}
           <tr>
-            <td data-label="Item">{{ item.nome }}<small>{{ item.categoria|default:"Sem categoria" }}</small></td>
+            <td data-label="Item">{{ item.emoji|default:'🛍️' }} {{ item.nome }}<small>{{ item.categoria|default:"Outros" }}</small></td>
             <td data-label="Valor">{{ item.preco|br_money }}</td>
             <td data-label="Estoque" class="{% if item.estoque_baixo %}negative{% endif %}">{{ item.estoque }}</td>
             <td data-label="Mínimo">{{ item.estoque_minimo }}</td>

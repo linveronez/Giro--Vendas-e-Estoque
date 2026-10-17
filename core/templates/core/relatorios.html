@@ -1,17 +1,30 @@
 {% extends "core/base.html" %}
 {% load currency %}
-{% block title %}Relatórios | Sistema de Cantina{% endblock %}
+{% block title %}Resumo | Giro{% endblock %}
 {% block content %}
 <header class="page-header">
   <div>
-    <p class="eyebrow">Gestão</p>
-    <h1>Relatórios</h1>
+    <p class="eyebrow">📊 Vendas e operação</p>
+    <h1>Resumo do caixa</h1>
   </div>
 </header>
 
+<form class="panel report-period-form" method="get">
+  <label>De <input type="date" name="data_inicio" value="{{ data_inicio|date:'Y-m-d' }}"></label>
+  <label>Até <input type="date" name="data_fim" value="{{ data_fim|date:'Y-m-d' }}"></label>
+  <button type="submit">Aplicar período</button>
+  <span class="muted">O padrão mostra o mês atual.</span>
+</form>
+
+<section class="metrics">
+  <article><span>💰 Total no período</span><strong>{{ total_periodo|br_money }}</strong></article>
+  <article><span>🧾 Vendas concluídas</span><strong>{{ quantidade_vendas }}</strong></article>
+  {% for pagamento in pagamentos_periodo %}<article><span>{{ pagamento.nome }}</span><strong>{{ pagamento.total|br_money }}</strong></article>{% endfor %}
+</section>
+
 <section class="report-grid">
   <section class="panel">
-    <h2>Itens mais vendidos</h2>
+    <h2>🏆 Produtos mais vendidos</h2>
     <table>
       <thead><tr><th>Item</th><th>Qtd.</th><th>Receita</th></tr></thead>
       <tbody>
@@ -21,7 +34,7 @@
   </section>
 
   <section class="panel">
-    <h2>Lista de compras</h2>
+    <h2>⚠️ Reposição de estoque</h2>
     <table>
       <thead><tr><th>Item</th><th>Estoque</th><th>Mínimo</th></tr></thead>
       <tbody>
@@ -30,35 +43,37 @@
     </table>
   </section>
 
-  <section class="panel">
-    <h2>Clientes em débito</h2>
-    <table>
-      <thead><tr><th>Cliente</th><th>Saldo</th></tr></thead>
-      <tbody>
-        {% for cliente in clientes_devedores %}<tr><td data-label="Cliente">{{ cliente.nome }}</td><td data-label="Saldo" class="negative">{{ cliente.credito|br_money }}</td></tr>{% empty %}<tr><td colspan="2">Nenhum débito.</td></tr>{% endfor %}
-      </tbody>
-    </table>
-  </section>
 </section>
 
 <section class="panel">
-  <h2>Vendas recentes</h2>
+  <h2>🧾 Vendas do período</h2>
   <table>
-    <thead><tr><th>Venda</th><th>Cliente</th><th>Total</th><th>Saldo final</th><th>Atendente</th><th>Data</th><th>Foto</th></tr></thead>
+    <thead><tr><th>Venda</th><th>Pagamento</th><th>Total</th><th>Atendente</th><th>Data</th><th>Ação</th></tr></thead>
     <tbody>
       {% for venda in vendas %}
         <tr>
           <td data-label="Venda">#{{ venda.id }}</td>
-          <td data-label="Cliente">{{ venda.cliente.nome }}</td>
+          <td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td>
           <td data-label="Total">{{ venda.total|br_money }}</td>
-          <td data-label="Saldo final" class="{% if venda.saldo_apos_venda < 0 %}negative{% else %}positive{% endif %}">{{ venda.saldo_apos_venda|br_money }}</td>
           <td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td>
           <td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td>
-          <td data-label="Foto">{% if venda.foto %}<a href="{{ venda.foto.url }}" target="_blank">Abrir</a>{% else %}-{% endif %}</td>
+          <td data-label="Ação"><form method="post" action="{% url 'cancelar_venda' venda.id %}" onsubmit="return confirm('Cancelar a venda e devolver os itens ao estoque?');">{% csrf_token %}<button class="danger-button small-button" type="submit">Cancelar</button></form></td>
         </tr>
       {% empty %}
-        <tr><td colspan="7">Sem vendas registradas.</td></tr>
+        <tr><td colspan="6">Sem vendas nesse período.</td></tr>
       {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>↩️ Vendas canceladas</h2>
+  <table>
+    <thead><tr><th>Venda</th><th>Pagamento</th><th>Total</th><th>Atendente</th><th>Data</th></tr></thead>
+    <tbody>
+      {% for venda in vendas_canceladas %}
+        <tr><td data-label="Venda">#{{ venda.id }}</td><td data-label="Pagamento">{{ venda.get_forma_pagamento_display }}</td><td data-label="Total">{{ venda.total|br_money }}</td><td data-label="Atendente">{{ venda.atendente.get_full_name|default:venda.atendente.username }}</td><td data-label="Data">{{ venda.criado_em|date:"d/m/Y H:i" }}</td></tr>
+      {% empty %}<tr><td colspan="5">Nenhuma venda cancelada.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>

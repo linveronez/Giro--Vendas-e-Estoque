@@ -4,23 +4,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1d4ed8">
+  <meta name="theme-color" content="#14532d">
   <link rel="manifest" href="{% url 'manifest' %}">
   <link rel="stylesheet" href="{% static 'core/styles.css' %}">
-  <title>Entrar | Sistema de Cantina</title>
+  <title>Entrar | Giro</title>
 </head>
 <body class="login-page">
   <main class="login-shell">
     <section class="login-card">
-      <img class="login-logo" src="{% static 'core/recomecar-logo.svg' %}" alt="Recomeçar">
+      <span class="login-brand-icon" aria-hidden="true">🛍️</span>
       <p class="eyebrow">Projeto Integrador</p>
-      <h1>Cantina Recomeçar</h1>
-      <p class="muted">Sistema web para controlar créditos de clientes, estoque da cantina, vendas com registro fotográfico e relatórios básicos de gestão.</p>
+      <h1>Giro</h1>
+      <p class="muted">Um jeito simples de registrar vendas e acompanhar o estoque do seu negócio.</p>
 
       <div class="login-features">
-        <span>Cadastro de clientes e créditos</span>
-        <span>Controle de itens e estoque</span>
-        <span>Vendas com conferência por foto</span>
+        <span>🧾 Venda rápida por categoria</span>
+        <span>📦 Estoque atualizado automaticamente</span>
+        <span>📊 Resumo por forma de pagamento</span>
       </div>
 
       {% if form.errors %}
@@ -34,12 +34,6 @@
         <button type="submit">Entrar</button>
       </form>
 
-      <div class="demo-box">
-        <strong>Acessos iniciais</strong>
-        <span>dono / 123456</span>
-        <span>coordenador / 123456</span>
-        <span>atendente / 123456</span>
-      </div>
     </section>
   </main>
 </body>

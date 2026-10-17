@@ -45,7 +45,9 @@ class ClienteUpdateForm(forms.ModelForm):
 class ItemForm(forms.ModelForm):
     class Meta:
         model = Item
-        fields = ["nome", "categoria", "preco", "estoque", "estoque_minimo", "ativo"]
+        fields = ["nome", "categoria", "emoji", "preco", "estoque", "estoque_minimo", "ativo"]
+        labels = {"emoji": "Emoji (opcional)", "estoque_minimo": "Estoque mínimo"}
+        widgets = {"emoji": forms.TextInput(attrs={"maxlength": 16, "placeholder": "ex.: ☕"})}
 
 
 class ItemPrecoForm(forms.Form):

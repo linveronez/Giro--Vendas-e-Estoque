@@ -4,24 +4,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1d4ed8">
+  <meta name="theme-color" content="#14532d">
   <link rel="manifest" href="{% url 'manifest' %}">
   <link rel="stylesheet" href="{% static 'core/styles.css' %}">
-  <title>{% block title %}Sistema de Cantina{% endblock %}</title>
+  <title>{% block title %}Giro | Vendas e Estoque{% endblock %}</title>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{% url 'dashboard' %}">
-        <img class="brand-logo" src="{% static 'core/recomecar-mark.svg' %}" alt="Recomeçar">
-        <span><strong>Recomeçar</strong><small>Cantina institucional</small></span>
+        <span class="brand-emoji" aria-hidden="true">🛍️</span>
+        <span><strong>Giro</strong><small>Vendas & estoque</small></span>
       </a>
       <nav>
         <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Início</a>
-        <a href="{% url 'clientes' %}" class="{% if request.resolver_match.url_name == 'clientes' %}active{% endif %}">Clientes</a>
-        <a href="{% url 'itens' %}" class="{% if request.resolver_match.url_name == 'itens' %}active{% endif %}">Itens</a>
-        <a href="{% url 'vendas' %}" class="{% if request.resolver_match.url_name == 'vendas' %}active{% endif %}">Vendas</a>
-        {% if can_view_reports %}<a href="{% url 'relatorios' %}" class="{% if request.resolver_match.url_name == 'relatorios' %}active{% endif %}">Relatórios</a>{% endif %}
+        <a href="{% url 'vendas' %}" class="{% if request.resolver_match.url_name == 'vendas' %}active{% endif %}">🧾 Caixa</a>
+        <a href="{% url 'itens' %}" class="{% if request.resolver_match.url_name == 'itens' %}active{% endif %}">📦 Produtos</a>
+        <a href="{% url 'relatorios' %}" class="{% if request.resolver_match.url_name == 'relatorios' %}active{% endif %}">📊 Resumo</a>
       </nav>
       <div class="user-box">
         <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
