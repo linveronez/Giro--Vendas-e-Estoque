@@ -1,13 +1,10 @@
-import base64
 import csv
-import io
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.staticfiles.storage import staticfiles_storage
-from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Case, CharField, F, Sum, When
 from django.http import HttpResponse, JsonResponse
@@ -16,8 +13,8 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from .forms import CategoriaForm, ClienteForm, ClienteUpdateForm, CreditoForm, ItemCustoForm, ItemEstoqueForm, ItemForm, ItemPrecoForm
-from .models import Categoria, Cliente, DEFAULT_CATEGORIAS, Item, MovimentoCredito, Venda, VendaItem
+from .forms import CategoriaForm, ItemCustoForm, ItemEstoqueForm, ItemForm, ItemPrecoForm
+from .models import Categoria, DEFAULT_CATEGORIAS, Item, Venda, VendaItem
 
 
 ROLE_OWNER = "Dono"
@@ -37,18 +34,6 @@ def user_role(user) -> str:
     return ROLE_ATTENDANT
 
 
-def can_manage_credit(user) -> bool:
-    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
-
-
-def can_manage_clients(user) -> bool:
-    return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
-
-
-def can_debit_credit(user) -> bool:
-    return user_role(user) == ROLE_OWNER
-
-
 def can_manage_items(user) -> bool:
     return user_role(user) in {ROLE_OWNER, ROLE_MANAGER}
 
@@ -60,9 +45,6 @@ def can_view_reports(user) -> bool:
 def role_context(request) -> dict:
     return {
         "role": user_role(request.user),
-        "can_manage_clients": can_manage_clients(request.user),
-        "can_manage_credit": can_manage_credit(request.user),
-        "can_debit_credit": can_debit_credit(request.user),
         "can_manage_items": can_manage_items(request.user),
         "can_view_reports": can_view_reports(request.user),
     }
@@ -92,102 +74,6 @@ def dashboard(request):
         "ultimas_vendas": Venda.objects.select_related("atendente").filter(status="concluida")[:6],
     }
     return render(request, "core/dashboard.html", context)
-
-
-@login_required
-def clientes(request):
-    if request.method == "POST":
-        if not can_manage_credit(request.user):
-            messages.error(request, "Atendentes nao cadastram credito inicial.")
-            return redirect("clientes")
-        form = ClienteForm(request.POST, request.FILES)
-        if form.is_valid():
-            cliente = form.save(commit=False)
-            cliente.credito = form.cleaned_data.get("credito_inicial") or Decimal("0.00")
-            cliente.save()
-            foto = decode_camera_photo(request.POST.get("foto_base64", ""))
-            if foto:
-                cliente.foto.save(f"cliente-{cliente.pk}.png", foto, save=True)
-            if cliente.credito:
-                MovimentoCredito.objects.create(
-                    cliente=cliente,
-                    usuario=request.user,
-                    valor=cliente.credito,
-                    tipo=MovimentoCredito.CREDITO,
-                    observacao="Credito inicial",
-                )
-            messages.success(request, "Cliente cadastrado com sucesso.")
-            return redirect("clientes")
-    else:
-        form = ClienteForm()
-
-    context = {
-        **role_context(request),
-        "form": form,
-        "credito_form": CreditoForm(),
-        "clientes": Cliente.objects.all(),
-    }
-    return render(request, "core/clientes.html", context)
-
-
-@login_required
-@require_POST
-def atualizar_cliente(request, cliente_id):
-    if not can_manage_clients(request.user):
-        messages.error(request, "Somente Dono ou Gerente atualiza cadastro de cliente.")
-        return redirect("clientes")
-
-    cliente = get_object_or_404(Cliente, pk=cliente_id)
-    form = ClienteUpdateForm(request.POST, request.FILES, instance=cliente)
-    if form.is_valid():
-        cliente = form.save(commit=False)
-        foto = decode_camera_photo(request.POST.get("foto_base64", ""))
-        if form.cleaned_data["remover_foto"] and cliente.foto:
-            cliente.foto.delete(save=False)
-            cliente.foto = None
-        if foto:
-            if cliente.foto:
-                cliente.foto.delete(save=False)
-            cliente.foto.save(f"cliente-{cliente.pk}.png", foto, save=False)
-        if form.cleaned_data["remover_comprovante_pix"] and cliente.comprovante_pix:
-            cliente.comprovante_pix.delete(save=False)
-            cliente.comprovante_pix = None
-        cliente.save()
-        messages.success(request, "Cadastro do cliente atualizado.")
-    else:
-        messages.error(request, "Revise os dados do cadastro.")
-    return redirect("clientes")
-
-
-@login_required
-@require_POST
-def ajustar_credito(request):
-    if not can_manage_credit(request.user):
-        messages.error(request, "Somente Dono ou Gerente ajusta credito.")
-        return redirect("clientes")
-
-    form = CreditoForm(request.POST)
-    if form.is_valid():
-        cliente = get_object_or_404(Cliente, pk=form.cleaned_data["cliente_id"])
-        valor = form.cleaned_data["valor"]
-        tipo = form.cleaned_data["tipo"]
-        if tipo == MovimentoCredito.DEBITO and not can_debit_credit(request.user):
-            messages.error(request, "Somente o perfil Dono pode retirar credito por correcao.")
-            return redirect("clientes")
-        valor_final = valor if tipo == MovimentoCredito.CREDITO else -valor
-        cliente.credito += valor_final
-        cliente.save(update_fields=["credito", "atualizado_em"])
-        MovimentoCredito.objects.create(
-            cliente=cliente,
-            usuario=request.user,
-            valor=valor_final,
-            tipo=tipo,
-            observacao=form.cleaned_data["observacao"],
-        )
-        messages.success(request, "Credito atualizado.")
-    else:
-        messages.error(request, "Revise o valor informado.")
-    return redirect("clientes")
 
 
 @login_required
@@ -484,13 +370,6 @@ def criar_venda(request):
 
     messages.success(request, "Venda registrada com sucesso.")
     return redirect("vendas")
-
-
-def decode_camera_photo(data_url: str) -> ContentFile | None:
-    prefix = "data:image/png;base64,"
-    if not data_url.startswith(prefix):
-        return None
-    return ContentFile(base64.b64decode(data_url[len(prefix):]))
 
 
 @login_required

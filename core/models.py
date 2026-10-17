@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator
-from django.urls import reverse
 
 
 class Cliente(models.Model):
@@ -24,9 +23,6 @@ class Cliente(models.Model):
 
     def __str__(self) -> str:
         return self.nome
-
-    def get_absolute_url(self) -> str:
-        return reverse("clientes")
 
 
 DEFAULT_CATEGORIAS = [
@@ -131,7 +127,7 @@ class Venda(models.Model):
         verbose_name_plural = "vendas"
 
     def __str__(self) -> str:
-        return f"Venda #{self.pk} - {self.cliente}"
+        return f"Venda #{self.pk}"
 
     def get_forma_pagamento_display(self) -> str:
         if self.forma_pagamento in {"cartao", "cartao_historico"}:
