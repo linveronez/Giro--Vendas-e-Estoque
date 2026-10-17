@@ -49,11 +49,15 @@ O arquivo `render.yaml` define o serviço web no Render, sem criar um banco temp
 3. Na configuração inicial do Blueprint, informe a connection string do Neon em `DATABASE_URL`. Se o serviço ou Blueprint já existir, preencha ou atualize `DATABASE_URL` manualmente na área **Environment** do serviço.
 4. Mantenha `DEBUG=False` e deixe o Render gerar `SECRET_KEY`.
 5. Faça o deploy. O comando de inicialização aplica as migrações antes de iniciar o Django.
-6. Crie um usuário de demonstração exclusivo no banco remoto pelo Shell do serviço:
+6. Depois que o primeiro deploy concluir as migrações, crie seu usuário no Neon. Como o plano gratuito do Render não oferece Shell, faça isso pelo PowerShell, na pasta do projeto e com as dependências instaladas:
 
    ```bash
+   $env:DATABASE_URL = Read-Host "Cole a connection string do Neon"
    python manage.py createsuperuser
+   Remove-Item Env:DATABASE_URL
    ```
+
+   O comando cria o usuário diretamente no Neon. Informe um nome e uma senha próprios; não use as credenciais locais de demonstração (`dono`, `coordenador` ou `atendente`).
 
 Não publique a connection string, a `SECRET_KEY` ou credenciais de acesso no GitHub. O primeiro acesso ao serviço pode levar mais tempo se a aplicação estiver inativa. O banco e o serviço web podem suspender recursos em planos gratuitos; consulte os limites atuais dos provedores e mantenha um backup dos dados importantes.
 
