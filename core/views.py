@@ -497,11 +497,23 @@ def decode_camera_photo(data_url: str) -> ContentFile | None:
 @manager_or_owner_required
 def relatorios(request):
     data_inicio, data_fim = _periodo_relatorio(request)
+    categorias = available_categories()
+    categorias_validas = {categoria.nome for categoria in categorias}
+    categoria_selecionada = request.GET.get("categoria", "").strip()
+    if categoria_selecionada not in categorias_validas:
+        categoria_selecionada = ""
+
     vendas_periodo = Venda.objects.filter(
         criado_em__date__gte=data_inicio,
         criado_em__date__lte=data_fim,
         status="concluida",
     )
+    linhas_mais_vendidas = VendaItem.objects.filter(venda__in=vendas_periodo)
+    itens_reposicao = Item.objects.filter(ativo=True, estoque__lte=F("estoque_minimo"))
+    if categoria_selecionada:
+        linhas_mais_vendidas = linhas_mais_vendidas.filter(item__categoria=categoria_selecionada)
+        itens_reposicao = itens_reposicao.filter(categoria=categoria_selecionada)
+
     formas_pagamento = list(Venda.PAGAMENTOS) + [("cartao_historico", "Cartão (registro antigo)")]
     resultado_custo = VendaItem.objects.filter(venda__in=vendas_periodo, custo_unitario__isnull=False).annotate(
         receita_liquida_linha=F("subtotal") - F("desconto"),
@@ -526,6 +538,8 @@ def relatorios(request):
         )[:100],
         "data_inicio": data_inicio,
         "data_fim": data_fim,
+        "categorias": categorias,
+        "categoria_selecionada": categoria_selecionada,
         "total_periodo": vendas_periodo.aggregate(total=Sum("total"))["total"] or 0,
         "subtotal_periodo": vendas_periodo.aggregate(total=Sum("subtotal"))["total"] or Decimal("0.00"),
         "desconto_periodo": vendas_periodo.aggregate(total=Sum("desconto"))["total"] or Decimal("0.00"),
@@ -540,7 +554,7 @@ def relatorios(request):
             for value, label in formas_pagamento
         ],
         "itens_mais_vendidos": (
-            VendaItem.objects.filter(venda__in=vendas_periodo).annotate(
+            linhas_mais_vendidas.annotate(
                 nome=Case(
                     When(avulso=True, then=F("descricao_avulso")),
                     default=F("item__nome"),
@@ -550,7 +564,7 @@ def relatorios(request):
             .annotate(quantidade=Sum("quantidade"), receita=Sum("receita_liquida_linha"))
             .order_by("-quantidade")[:10]
         ),
-        "lista_compras": Item.objects.filter(ativo=True, estoque__lte=F("estoque_minimo")).order_by("estoque"),
+        "lista_compras": itens_reposicao.order_by("estoque", "nome"),
     }
     return render(request, "core/relatorios.html", context)
 

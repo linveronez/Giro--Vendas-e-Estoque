@@ -251,7 +251,8 @@ button:hover:not(:disabled), .button:hover { box-shadow: 0 5px 14px rgba(18, 53,
 .adhoc-panel > div { display: grid; gap: 5px; }
 .adhoc-panel label { font-size: 12px; }
 .adhoc-panel input { min-width: 0; }
-.report-period-form { align-items: end; display: grid; gap: 12px; grid-template-columns: 180px 180px auto 1fr; }
+.report-period-form { align-items: end; display: grid; gap: 12px; grid-template-columns: 180px 180px minmax(220px, 1fr) auto; }
+.report-period-form > span { grid-column: 1 / -1; }
 .report-exports h2 { margin-bottom: 6px; }
 .report-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .mobile-cart-bar { display: none; }

@@ -12,8 +12,16 @@
 <form class="panel report-period-form" method="get">
   <label>De <input type="date" name="data_inicio" value="{{ data_inicio|date:'Y-m-d' }}"></label>
   <label>Até <input type="date" name="data_fim" value="{{ data_fim|date:'Y-m-d' }}"></label>
+  <label>Categoria dos quadros de produtos
+    <select name="categoria">
+      <option value="">Todas as categorias</option>
+      {% for categoria in categorias %}
+        <option value="{{ categoria.nome }}" {% if categoria.nome == categoria_selecionada %}selected{% endif %}>{{ categoria.emoji }} {{ categoria.nome }}</option>
+      {% endfor %}
+    </select>
+  </label>
   <button type="submit">Aplicar período</button>
-  <span class="muted">O padrão mostra o mês atual.</span>
+  <span class="muted">O padrão mostra o mês atual. A categoria filtra o ranking e a reposição; totais e vendas continuam mostrando todas as categorias do período.</span>
 </form>
 
 <section class="panel report-exports">

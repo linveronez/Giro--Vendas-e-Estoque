@@ -19,7 +19,7 @@ O código Django é publicado no Render e os dados da versão online ficam no Po
 - Guarda o custo unitário do produto no item vendido, preservando o histórico quando o custo atual muda. O Resumo calcula lucro e margem brutos usando apenas itens com custo conhecido.
 - Permite lançar um item avulso com descrição, preço e quantidade. O item aparece no histórico da venda, mas não movimenta o estoque.
 - Permite cancelar uma venda, devolvendo os produtos cadastrados ao estoque.
-- Exibe resumo por período, totais por forma de pagamento, produtos mais vendidos, reposição de estoque e histórico de cancelamentos.
+- Exibe resumo por período, totais por forma de pagamento, produtos mais vendidos, reposição de estoque e histórico de cancelamentos; o ranking e a reposição podem ser filtrados por categoria.
 - Permite ao Dono e ao Gerente exportar vendas do período, estoque atual e produtos cadastrados em CSV compatível com planilhas.
 - Usa dados fictícios para a demonstração. O fluxo de venda não exige cadastro de clientes nem armazena fotos ou comprovantes.
 
